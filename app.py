@@ -2,17 +2,23 @@ import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 from datetime import datetime
+import os
 
-# --- CONFIGURACIÓN DE PÁGINA ---
-st.set_page_config(page_title="Penca Würth 2026", page_icon="⚽", layout="wide")
+# --- CONFIGURACIÓN DE PÁGINA (Favicon Local) ---
+# Si tu archivo se llama 'favicon.png', Streamlit lo tomará de la raíz
+st.set_page_config(
+    page_title="Penca Würth 2026", 
+    page_icon="favicon.png", 
+    layout="wide"
+)
 
 # Conexión a Google Sheets
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# --- ESTILOS Y LIMPIEZA DE INTERFAZ (Ocultar Menú/Share/Estrella) ---
+# --- ESTILOS Y LIMPIEZA DE INTERFAZ ---
 st.markdown("""
     <style>
-    /* Ocultar elementos nativos de Streamlit */
+    /* Ocultar elementos de Streamlit */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
@@ -44,12 +50,18 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- CABECERA ---
+# --- CABECERA (Logo Local) ---
 with st.container():
     col1, col2 = st.columns([1, 4])
     with col1:
-        # Logo oficial desde repositorio público
-        st.image("https://upload.wikimedia.org/wikipedia/commons/1/1e/Wuerth_Logo_2024.svg", width=200)
+        # Intentamos cargar el logo local, si no existe ponemos un texto de respaldo
+        if os.path.exists("logo_wurth.svg"):
+            st.image("logo_wurth.svg", width=200)
+        elif os.path.exists("logo_wurth.png"):
+            st.image("logo_wurth.png", width=200)
+        else:
+            st.error("Logo no encontrado")
+            
     with col2:
         st.markdown("<h1 class='main-title'>PENCA DIGITAL WÜRTH 2026</h1>", unsafe_allow_html=True)
         st.markdown("<p style='margin-top:-20px; font-weight:bold; color: #555;'>Market Intelligence Unit • Uruguay</p>", unsafe_allow_html=True)
@@ -89,9 +101,12 @@ with tab1:
                 es_uruguay = row['local'] == 'Uruguay' or row['visitante'] == 'Uruguay'
                 border = "8px solid #ED1C24" if es_uruguay else "1px solid #ddd"
                 
-                # Bloqueo horario (Hora Uruguay)
-                f_dt = datetime.strptime(f"{row['fecha']} {row['hora_uy']}", "%Y-%m-%d %H:%M")
-                bloqueado = ahora >= f_dt
+                # Bloqueo horario (Basado en la fecha del CSV)
+                try:
+                    f_dt = datetime.strptime(f"{row['fecha']} {row['hora_uy']}", "%Y-%m-%d %H:%M")
+                    bloqueado = ahora >= f_dt
+                except:
+                    bloqueado = False
 
                 st.markdown(f"<div style='border-left: {border}; padding: 15px; margin-bottom:10px; border-radius:5px; background-color:#f9f9f9;'>", unsafe_allow_html=True)
                 c1, c_vs, c2 = st.columns([2, 1, 2])
@@ -112,7 +127,7 @@ with tab1:
                     df_old = obtener_datos("apuestas")
                     conn.update(worksheet="apuestas", data=pd.concat([df_old, df_new], ignore_index=True))
                     st.success("✅ ¡Pronósticos guardados exitosamente!")
-                else: st.error("⚠️ Falta el nombre de usuario.")
+                else: st.error("⚠️ Indica tu nombre para guardar.")
     else:
         st.warning("Carga los partidos en la planilla 'partidos'.")
 
@@ -126,8 +141,8 @@ with tab2:
                 df_v_new = pd.DataFrame([[u_v, val_v, ahora.strftime("%Y-%m-%d %H:%M")]], columns=['usuario','apuesta_porcentaje','timestamp'])
                 df_v_old = obtener_datos("ventas")
                 conn.update(worksheet="ventas", data=pd.concat([df_v_old, df_v_new], ignore_index=True))
-                st.success(f"🎯 Registrado: {val_v}% para {u_v}")
-            else: st.error("⚠️ Ingresa tu nombre.")
+                st.success(f"🎯 Registrado: {val_v}%")
+            else: st.error("⚠️ Indica tu nombre.")
 
 with tab3:
     st.header("🥇 RANKING GENERAL")
@@ -139,7 +154,7 @@ with tab3:
         df_a['puntos'] = df_a.apply(lambda x: calcular_puntos_futbol(x, df_p), axis=1)
         rank = df_a.groupby('usuario')['puntos'].sum().reset_index()
         
-        # Resultado Real (Se actualiza cuando termine el evento)
+        # Este valor se cambia manualmente cuando se conoce el cierre real
         KPI_REAL = 101.60 
         
         if not df_v.empty and 'usuario' in df_v.columns:
