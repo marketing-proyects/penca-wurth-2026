@@ -38,12 +38,12 @@ st.markdown("""
         margin: 0 auto;
     }
 
-    /* EL AIRE DEL LOGO: Padding de 2px para evitar redondeo del JPG */
+    /* EL AIRE DEL LOGO: Padding de 4px para evitar redondeo del JPG */
     .logo-frame {
         background-color: white;
-        padding: 2px;
+        padding: 4px;
         display: inline-block;
-        margin-bottom: 5px;
+        margin-bottom: 10px;
     }
 
     h1, h2, h3 { color: #ED1C24 !important; font-family: 'Arial Black', sans-serif; text-transform: uppercase; }
