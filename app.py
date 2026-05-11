@@ -7,7 +7,7 @@ import os
 # --- CONFIGURACIÓN DE PÁGINA (Favicon Local) ---
 st.set_page_config(
     page_title="Penca Würth 2026", 
-    page_icon="favicon.png", 
+    page_icon="favicon.jpg", 
     layout="wide"
 )
 
