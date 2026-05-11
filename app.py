@@ -5,7 +5,6 @@ from datetime import datetime
 import os
 
 # --- CONFIGURACIÓN DE PÁGINA (Favicon Local) ---
-# Si tu archivo se llama 'favicon.png', Streamlit lo tomará de la raíz
 st.set_page_config(
     page_title="Penca Würth 2026", 
     page_icon="favicon.png", 
@@ -15,10 +14,10 @@ st.set_page_config(
 # Conexión a Google Sheets
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# --- ESTILOS Y LIMPIEZA DE INTERFAZ ---
+# --- ESTILOS Y LIMPIEZA DE INTERFAZ (Ocultar Menú/Share/Estrella) ---
 st.markdown("""
     <style>
-    /* Ocultar elementos de Streamlit */
+    /* Ocultar elementos nativos de Streamlit */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
@@ -54,13 +53,10 @@ st.markdown("""
 with st.container():
     col1, col2 = st.columns([1, 4])
     with col1:
-        # Intentamos cargar el logo local, si no existe ponemos un texto de respaldo
-        if os.path.exists("logo_wurth.svg"):
-            st.image("logo_wurth.svg", width=200)
-        elif os.path.exists("logo_wurth.png"):
-            st.image("logo_wurth.png", width=200)
+        if os.path.exists("logo_wurth.png"):
+            st.image("logo_wurth.png", width=220)
         else:
-            st.error("Logo no encontrado")
+            st.error("Cargar logo_wurth.png en GitHub")
             
     with col2:
         st.markdown("<h1 class='main-title'>PENCA DIGITAL WÜRTH 2026</h1>", unsafe_allow_html=True)
@@ -101,7 +97,7 @@ with tab1:
                 es_uruguay = row['local'] == 'Uruguay' or row['visitante'] == 'Uruguay'
                 border = "8px solid #ED1C24" if es_uruguay else "1px solid #ddd"
                 
-                # Bloqueo horario (Basado en la fecha del CSV)
+                # Bloqueo horario
                 try:
                     f_dt = datetime.strptime(f"{row['fecha']} {row['hora_uy']}", "%Y-%m-%d %H:%M")
                     bloqueado = ahora >= f_dt
@@ -126,7 +122,7 @@ with tab1:
                     df_new = pd.DataFrame(apuestas_lista, columns=['usuario','partido_id','goles_local','goles_visitante','timestamp'])
                     df_old = obtener_datos("apuestas")
                     conn.update(worksheet="apuestas", data=pd.concat([df_old, df_new], ignore_index=True))
-                    st.success("✅ ¡Pronósticos guardados exitosamente!")
+                    st.success("✅ ¡Pronósticos guardados!")
                 else: st.error("⚠️ Indica tu nombre para guardar.")
     else:
         st.warning("Carga los partidos en la planilla 'partidos'.")
@@ -154,8 +150,7 @@ with tab3:
         df_a['puntos'] = df_a.apply(lambda x: calcular_puntos_futbol(x, df_p), axis=1)
         rank = df_a.groupby('usuario')['puntos'].sum().reset_index()
         
-        # Este valor se cambia manualmente cuando se conoce el cierre real
-        KPI_REAL = 101.60 
+        KPI_REAL = 101.60 # Editar cuando se sepa el cierre real
         
         if not df_v.empty and 'usuario' in df_v.columns:
             df_v['err'] = abs(df_v['apuesta_porcentaje'] - KPI_REAL).round(2)
