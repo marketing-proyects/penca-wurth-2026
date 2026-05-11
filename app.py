@@ -14,16 +14,16 @@ st.set_page_config(
 # Conexión a Google Sheets
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# --- 2. CSS: ESTILO CEREBRO (Fondo Fundido y Logo Blindado) ---
+# --- 2. CSS DE ALTA PRIORIDAD (TÉCNICA CEREBRO) ---
 st.markdown("""
     <style>
-    /* Ocultar elementos nativos de Streamlit */
+    /* Ocultar elementos nativos */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
     [data-testid="stHeader"] {display: none;}
     
-    /* FONDO: Opacidad alta para legibilidad total (Estilo Puntos/Cerebro) */
+    /* FONDO: Opacidad 95% (Casi blanco, estética limpia) */
     .stApp {
         background: linear-gradient(rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.95)), 
                     url("https://images.unsplash.com/photo-1574629810360-7efbbe195018?q=80&w=2093&auto=format&fit=crop");
@@ -32,34 +32,34 @@ st.markdown("""
         background-attachment: fixed;
     }
 
-    /* CONTENEDOR DEL LOGO: Técnica CEREBRO para evitar redondeo */
-    .logo-container-cerebro {
+    /* ELIMINAR REDONDEO DE STREAMLIT (Target directo a la imagen) */
+    [data-testid="stImage"] img {
+        border-radius: 0px !important;
+    }
+
+    /* CONTENEDOR DEL LOGO: Sin redondeos y con aire blanco */
+    .logo-box-cerebro {
         background-color: white !important;
-        padding: 4px !important;
-        border-radius: 0px !important; /* Fuerza esquinas rectas */
+        padding: 5px !important;
+        border-radius: 0px !important;
         display: inline-block;
         line-height: 0;
-        margin-bottom: 15px;
-        border: 1px solid #f0f0f0; /* Un aire sutil de contorno */
-    }
-    
-    /* Forzar que la imagen interna no herede redondeos */
-    .logo-container-cerebro img {
-        border-radius: 0px !important;
+        margin-bottom: 20px;
+        border: 1px solid #eee; /* Un pequeño borde para definir el bloque */
     }
 
     h1, h2, h3 { color: #ED1C24 !important; font-family: 'Arial Black', sans-serif; text-transform: uppercase; }
     
     .main-title {
         color: #ED1C24;
-        font-size: 44px;
+        font-size: 42px;
         font-family: 'Arial Black', sans-serif;
-        margin-top: 5px;
+        margin-top: 0px;
         margin-bottom: 30px;
         letter-spacing: -1px;
     }
     
-    /* Tabs estilo corporativo */
+    /* Pestañas estilo Puntos/Cerebro */
     .stTabs [data-baseweb="tab-list"] { 
         gap: 12px; 
         border-bottom: 2px solid #ED1C24;
@@ -67,7 +67,7 @@ st.markdown("""
     .stTabs [data-baseweb="tab"] { 
         background-color: rgba(255, 255, 255, 0.8); 
         border-radius: 4px 4px 0 0; 
-        padding: 12px 30px; 
+        padding: 12px 25px; 
         font-weight: bold;
     }
     .stTabs [aria-selected="true"] { 
@@ -79,15 +79,15 @@ st.markdown("""
 
 # --- 3. RENDERIZADO ---
 
-# Contenedor del Logo (Aplicando técnica CEREBRO)
-st.markdown('<div class="logo-container-cerebro">', unsafe_allow_html=True)
+# Logo con blindaje de esquinas
+st.markdown('<div class="logo-box-cerebro">', unsafe_allow_html=True)
 if os.path.exists("logo_wurth.jpg"):
-    st.image("logo_wurth.jpg", width=230)
+    st.image("logo_wurth.jpg", width=220)
 else:
     st.write("### WÜRTH")
 st.markdown('</div>', unsafe_allow_html=True)
 
-# Título Principal (Sin subtítulos de unidad)
+# Título Principal
 st.markdown("<h1 class='main-title'>PENCA DIGITAL WÜRTH 2026</h1>", unsafe_allow_html=True)
 
 # Pestañas
@@ -101,8 +101,6 @@ with tab1:
     st.markdown("<br>", unsafe_allow_html=True)
     df_p = obtener_datos("partidos")
     if not df_p.empty:
-        st.info("El fixture está listo. Ingresa tus pronósticos debajo.")
+        st.info("Fixture listo para completar.")
     else:
         st.warning("No se encontraron partidos en la base de datos.")
-
-# El contenido ahora fluye con máxima legibilidad sobre el fondo fundido
