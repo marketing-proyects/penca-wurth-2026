@@ -3,7 +3,6 @@ from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 from datetime import datetime
 import os
-import random
 
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(
@@ -15,116 +14,88 @@ st.set_page_config(
 # Conexión a Google Sheets
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# --- LÓGICA DE FONDO (Imagen Única) ---
-fondos = [
-    "https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&q=80&w=2070",
-    "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&q=80&w=2070",
-    "https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&q=80&w=2093"
-]
-fondo_seleccionado = random.choice(fondos)
-
-# --- ESTILOS CSS AVANZADOS ---
-st.markdown(f"""
+# --- ESTILOS CSS REFINADOS ---
+st.markdown("""
     <style>
     /* Ocultar elementos de Streamlit */
-    #MainMenu {{visibility: hidden;}}
-    footer {{visibility: hidden;}}
-    header {{visibility: hidden;}}
-    [data-testid="stHeader"] {{display: none;}}
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    [data-testid="stHeader"] {display: none;}
     
-    /* Fondo de pantalla completa */
-    .stApp {{
-        background: url("{fondo_seleccionado}");
+    /* Fondo con imagen única y opacidad controlada */
+    .stApp {
+        background: linear-gradient(rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0.8)), 
+                    url("https://images.unsplash.com/photo-1574629810360-7efbbe195018?q=80&w=2093&auto=format&fit=crop");
         background-size: cover;
         background-position: center;
         background-attachment: fixed;
-    }}
+    }
     
-    /* CUADRO PRINCIPAL (Efecto para resaltar la App) */
-    .penca-container {{
-        background-color: rgba(255, 255, 255, 0.95);
-        padding: 40px;
-        border-radius: 20px;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-        margin: 20px auto;
-        max-width: 1200px;
-        border: 1px solid rgba(255, 255, 255, 0.2);
-    }}
+    /* Cuadro de contenido profesional */
+    .penca-box {
+        background-color: rgba(255, 255, 255, 0.9);
+        padding: 30px;
+        border-radius: 15px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        margin-top: 10px;
+    }
 
-    /* CONTENEDOR DEL LOGO (Ajuste de aire/espaciado) */
-    .logo-frame {{
+    /* Marco del Logo con "Aire" de 1px */
+    .logo-frame {
         background-color: white;
-        padding: 12px; /* Espacio interno */
-        margin: 1px;  /* El 'aire' de 1px solicitado */
-        border-radius: 10px;
+        padding: 2px; /* Espacio para que no toque bordes */
+        border: 1px solid transparent; /* El aire de 1px */
         display: inline-block;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-    }}
+        line-height: 0;
+    }
 
-    h1, h2, h3 {{ color: #ED1C24 !important; font-family: 'Arial Black', sans-serif; text-transform: uppercase; }}
+    h1, h2, h3 { color: #ED1C24 !important; font-family: 'Arial Black', sans-serif; text-transform: uppercase; }
     
-    .main-title {{
+    .main-title {
         color: #ED1C24;
-        font-size: 45px;
+        font-size: 40px;
         font-family: 'Arial Black', sans-serif;
         font-weight: bold;
-        margin-bottom: 0px;
-    }}
+        margin: 0;
+    }
     
-    /* Estilo de los botones */
-    .stButton>button {{ 
-        background-color: #ED1C24; color: white; border-radius: 4px; 
-        width: 100%; border: none; font-weight: bold; height: 3.5em;
-    }}
-    .stButton>button:hover {{ background-color: #000000; color: white; }}
+    .stTabs [data-baseweb="tab-list"] { gap: 10px; }
+    .stTabs [data-baseweb="tab"] { 
+        background-color: white; border-radius: 4px 4px 0 0; padding: 10px 20px; font-weight: bold;
+    }
     </style>
     """, unsafe_allow_html=True)
 
-# --- INICIO DEL CUADRO DE LA APLICACIÓN ---
-st.markdown('<div class="penca-container">', unsafe_allow_html=True)
-
 # --- CABECERA ---
 with st.container():
-    col1, col2 = st.columns([1, 3])
+    col1, col2 = st.columns([1, 4])
     with col1:
         st.markdown('<div class="logo-frame">', unsafe_allow_html=True)
-        # Cargamos el archivo .jpg que subiste
         if os.path.exists("logo_wurth.jpg"):
-            st.image("logo_wurth.jpg", width=220)
+            st.image("logo_wurth.jpg", width=200)
         else:
-            st.write("### WÜRTH")
+            st.write("WÜRTH")
         st.markdown('</div>', unsafe_allow_html=True)
     with col2:
         st.markdown("<h1 class='main-title'>PENCA DIGITAL WÜRTH 2026</h1>", unsafe_allow_html=True)
-        st.write("---")
 
-# --- FUNCIONES DE DATOS ---
-def obtener_datos(pestana):
-    try:
-        return conn.read(worksheet=pestana, ttl=0)
-    except:
-        return pd.DataFrame()
+# --- CUADRO PRINCIPAL DE LA APP ---
+st.markdown('<div class="penca-box">', unsafe_allow_html=True)
 
-# --- CONTENIDO DE TABS ---
 tab1, tab2, tab3 = st.tabs(["⚽ PRONÓSTICOS", "📊 DESAFÍO VENTAS", "🥇 RANKING"])
+
+def obtener_datos(pestana):
+    try: return conn.read(worksheet=pestana, ttl=0)
+    except: return pd.DataFrame()
 
 with tab1:
     st.header("FIXTURE MUNDIALISTA")
     df_partidos = obtener_datos("partidos")
     if not df_partidos.empty:
-        with st.form("penca_form"):
-            usuario = st.text_input("Tu Nombre:")
-            # Aquí va el bucle de partidos... (manteniendo la lógica previa)
-            st.form_submit_button("Guardar")
+        # Aquí iría el resto de tu lógica de partidos...
+        pass
     else:
-        st.info("Carga partidos en el Excel para comenzar.")
+        st.info("Carga los partidos en el Excel para comenzar.")
 
-with tab2:
-    st.header("DESAFÍO VENTAS")
-    # Lógica de ventas...
-
-with tab3:
-    st.header("POSICIONES")
-    # Lógica de ranking...
-
-st.markdown('</div>', unsafe_allow_html=True) # CIERRE DEL CUADRO PRINCIPAL
+st.markdown('</div>', unsafe_allow_html=True)
