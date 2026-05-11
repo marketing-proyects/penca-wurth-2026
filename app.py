@@ -14,16 +14,16 @@ st.set_page_config(
 # Conexión a Google Sheets
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# --- 2. CSS: ARQUITECTURA DE CAPAS (Lienzo Único) ---
+# --- 2. CSS DE ALTA PRIORIDAD (FORZADO DE CAPAS) ---
 st.markdown("""
     <style>
-    /* Ocultar elementos nativos de Streamlit */
+    /* 1. OCULTAR TODO LO QUE NO SEA NUESTRO LIENZO */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
     [data-testid="stHeader"] {display: none;}
     
-    /* CAPA 0: FONDO TOTAL */
+    /* 2. FONDO TOTAL (CAPA INFERIOR) */
     .stApp {
         background: linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)), 
                     url("https://images.unsplash.com/photo-1574629810360-7efbbe195018?q=80&w=2093&auto=format&fit=crop");
@@ -31,24 +31,29 @@ st.markdown("""
         background-position: center;
         background-attachment: fixed;
     }
-    
-    /* CAPA 1: EL LIENZO BLANCO (Contenedor Maestro) */
-    /* Este contenedor obliga a que todo lo de adentro tenga fondo blanco sólido */
-    .master-canvas {
-        background-color: white;
-        padding: 40px;
-        border-radius: 15px;
-        box-shadow: 0 20px 50px rgba(0,0,0,0.5);
-        margin: 40px auto;
-        max-width: 1100px;
-        min-height: 85vh;
+
+    /* 3. FORZAR TRANSPARENCIA EN CONTENEDORES INTERMEDIOS DE STREAMLIT */
+    [data-testid="stVerticalBlock"] > div {
+        background-color: transparent !important;
     }
 
-    /* EL AIRE DEL LOGO */
-    .logo-box {
+    /* 4. EL LIENZO MAESTRO BLANCO (CAPA SUPERIOR) */
+    .master-canvas {
+        background-color: white !important;
+        padding: 50px;
+        border-radius: 10px;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.7);
+        margin: 20px auto;
+        max-width: 1100px;
+        min-height: 85vh;
+        z-index: 99;
+    }
+
+    /* EL AIRE DEL LOGO JPG */
+    .logo-frame {
         padding: 2px;
-        display: inline-block;
         background-color: white;
+        display: inline-block;
         margin-bottom: 20px;
     }
 
@@ -59,10 +64,10 @@ st.markdown("""
         font-size: 42px;
         font-family: 'Arial Black', sans-serif;
         line-height: 1.1;
-        margin-top: 10px;
+        margin: 0;
     }
-
-    /* Tabs dentro del lienzo */
+    
+    /* Tabs dentro del lienzo blanco */
     .stTabs [data-baseweb="tab-list"] { gap: 10px; border-bottom: 2px solid #f0f2f6; }
     .stTabs [data-baseweb="tab"] { 
         background-color: #f8f9fa; border-radius: 4px 4px 0 0; padding: 12px 25px; font-weight: bold;
@@ -72,26 +77,26 @@ st.markdown("""
 
 # --- 3. RENDERIZADO DEL LIENZO MAESTRO ---
 
-# Abrimos el contenedor que atrapará TODO el contenido
+# Este div DEBE envolver absolutamente todo lo que sigue
 st.markdown('<div class="master-canvas">', unsafe_allow_html=True)
 
-# Cabecera integrada
-col_logo, col_titulo = st.columns([1, 3])
+# Cabecera
+col_log, col_tit = st.columns([1, 3])
 
-with col_logo:
-    st.markdown('<div class="logo-box">', unsafe_allow_html=True)
+with col_log:
+    st.markdown('<div class="logo-frame">', unsafe_allow_html=True)
     if os.path.exists("logo_wurth.jpg"):
         st.image("logo_wurth.jpg", width=220)
     else:
         st.write("### WÜRTH")
     st.markdown('</div>', unsafe_allow_html=True)
 
-with col_titulo:
+with col_tit:
     st.markdown("<h1 class='main-title'>PENCA DIGITAL<br>WÜRTH 2026</h1>", unsafe_allow_html=True)
 
 st.write("---")
 
-# Pestañas
+# Contenido Interactivo
 tab1, tab2, tab3 = st.tabs(["⚽ PRONÓSTICOS", "📊 DESAFÍO VENTAS", "🥇 RANKING"])
 
 def obtener_datos(pestana):
@@ -100,12 +105,11 @@ def obtener_datos(pestana):
 
 with tab1:
     st.header("FIXTURE MUNDIALISTA")
-    df_partidos = obtener_datos("partidos")
-    if not df_partidos.empty:
-        # Aquí puedes insertar el formulario de pronósticos que teníamos
-        st.info("Fixture listo para pronosticar.")
+    df_p = obtener_datos("partidos")
+    if not df_p.empty:
+        st.info("Fixture cargado desde GSheets.")
     else:
-        st.warning("Carga los partidos en la planilla 'partidos' del Excel.")
+        st.warning("No hay partidos en la planilla 'partidos'.")
 
-# Cerramos el contenedor maestro
+# IMPORTANTE: Cerramos el lienzo maestro al FINAL de todo el código
 st.markdown('</div>', unsafe_allow_html=True)
