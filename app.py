@@ -14,10 +14,10 @@ st.set_page_config(
 # Conexión a Google Sheets
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# --- 2. CSS: DEGRADADO DIRECCIONAL Y LOGO BLINDADO ---
+# --- 2. CSS: DEGRADADO DIRECCIONAL Y BLINDAJE LOGO CEREBRO ---
 st.markdown("""
     <style>
-    /* Ocultar elementos nativos */
+    /* Ocultar elementos nativos de Streamlit */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
@@ -37,7 +37,7 @@ st.markdown("""
         background-attachment: fixed;
     }
 
-    /* TÉCNICA CEREBRO: Eliminar redondeo de imagen de raíz */
+    /* TÉCNICA CEREBRO: Eliminar redondeo de imagen de raíz (Target directo al tag img) */
     [data-testid="stImage"] img {
         border-radius: 0px !important;
     }
@@ -79,12 +79,29 @@ st.markdown("""
         background-color: #ED1C24 !important; 
         color: white !important; 
     }
+    
+    /* Estilo para las filas de partidos */
+    .partido-row {
+        background-color: rgba(255, 255, 255, 0.6);
+        padding: 15px;
+        border-radius: 5px;
+        margin-bottom: 10px;
+        border-left: 5px solid #ED1C24;
+    }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. RENDERIZADO ---
+# --- 3. FUNCIONES DE DATOS ---
+def obtener_datos(pestana):
+    try:
+        return conn.read(worksheet=pestana, ttl=0)
+    except Exception as e:
+        st.error(f"Error al conectar con la pestaña {pestana}")
+        return pd.DataFrame()
 
-# Logo con blindaje de esquinas y aire de 1px
+# --- 4. RENDERIZADO DE CABECERA ---
+
+# Logo con blindaje de esquinas (Técnica CEREBRO)
 st.markdown('<div class="logo-box-cerebro">', unsafe_allow_html=True)
 if os.path.exists("logo_wurth.jpg"):
     st.image("logo_wurth.jpg", width=220)
@@ -95,17 +112,67 @@ st.markdown('</div>', unsafe_allow_html=True)
 # Título Principal
 st.markdown("<h1 class='main-title'>PENCA DIGITAL WÜRTH 2026</h1>", unsafe_allow_html=True)
 
-# Navegación
+# --- 5. ESTRUCTURA DE NAVEGACIÓN ---
 tab1, tab2, tab3 = st.tabs(["⚽ PRONÓSTICOS", "📊 DESAFÍO VENTAS", "🥇 RANKING"])
-
-def obtener_datos(pestana):
-    try: return conn.read(worksheet=pestana, ttl=0)
-    except: return pd.DataFrame()
 
 with tab1:
     st.markdown("<br>", unsafe_allow_html=True)
-    df_p = obtener_datos("partidos")
-    if not df_p.empty:
-        st.info("Fixture listo. Ingresa tus pronósticos para participar.")
+    
+    # CARGA AUTOMÁTICA DESDE GOOGLE SHEETS
+    df_partidos = obtener_datos("partidos")
+
+    if not df_partidos.empty:
+        with st.form("form_penca"):
+            usuario = st.text_input("Tu Nombre Completo:", placeholder="Ej: Juan Pérez")
+            st.divider()
+            
+            respuestas_usuario = []
+            
+            # Bucle para generar el fixture automáticamente
+            for index, row in df_partidos.iterrows():
+                with st.container():
+                    col_info, col_goles = st.columns([3, 2])
+                    
+                    with col_info:
+                        st.markdown(f"**{row['local']} vs {row['visitante']}**")
+                        st.caption(f"📅 {row['fecha']} | ⏰ {row['hora_uy']} hs")
+                    
+                    with col_goles:
+                        c1, c2 = st.columns(2)
+                        g_l = c1.number_input("L", 0, 20, 0, key=f"l_{row['id']}")
+                        g_v = c2.number_input("V", 0, 20, 0, key=f"v_{row['id']}")
+                    
+                    st.markdown("---")
+                    
+                    respuestas_usuario.append({
+                        "usuario": usuario,
+                        "partido_id": row['id'],
+                        "goles_local": g_l,
+                        "goles_visitante": g_v,
+                        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    })
+            
+            # Botón de Guardado
+            if st.form_submit_button("GUARDAR MIS PRONÓSTICOS"):
+                if usuario:
+                    # Lógica para persistir datos en la pestaña "apuestas"
+                    df_nuevas_apuestas = pd.DataFrame(respuestas_usuario)
+                    try:
+                        df_existente = obtener_datos("apuestas")
+                        df_final = pd.concat([df_existente, df_nuevas_apuestas], ignore_index=True)
+                        conn.update(worksheet="apuestas", data=df_final)
+                        st.success(f"¡Excelente {usuario}! Tus resultados han sido guardados.")
+                    except:
+                        st.error("Error al guardar. Verifica la pestaña 'apuestas'.")
+                else:
+                    st.warning("Por favor, ingresa tu nombre para registrar la apuesta.")
     else:
-        st.warning("No hay partidos configurados aún.")
+        st.warning("⚠️ No se encontraron partidos cargados en la pestaña 'partidos'.")
+
+with tab2:
+    st.header("🎯 Bono Especial: Día de Ventas")
+    st.info("Próximamente disponible.")
+
+with tab3:
+    st.header("🥇 Ranking de Posiciones")
+    st.info("El ranking se actualizará automáticamente con los resultados reales.")
