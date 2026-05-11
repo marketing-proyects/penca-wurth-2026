@@ -1,26 +1,32 @@
 import streamlit as st
-from src.styles import inject_custom_css # Función para el look & feel
+import pandas as pd
+from src.styles import inject_custom_css
+from src.logic import calcular_ganadores_ventas
 
-st.set_page_config(page_title="Penca Würth 2026", layout="wide")
-# inject_custom_css() # Aquí meteríamos el CSS del Rojo Würth
+inject_custom_css()
 
-st.title("🏆 Penca Mundialista & Negocios 2026")
-
-tabs = st.tabs(["⚽ Pronósticos", "📊 Desafío Ventas", "🥇 Ranking General"])
-
-with tabs[1]:
-    st.header("🎯 El Día Especial: Objetivo de Ventas")
-    st.info("Ingresa tu apuesta de cumplimiento para el día de ventas especial.")
+# Simulación de base de datos de puntos
+# En producción, esto se leería de st.connection("gsheets")
+def mostrar_ranking():
+    st.header("🥇 Ranking de la Penca Würth")
     
-    col1, col2 = st.columns(2)
-    with col1:
-        nombre = st.text_input("Tu Nombre/Vendedor")
-        apuesta_v = st.number_input("Tu apuesta (%)", min_value=0.00, max_value=200.00, step=0.01, format="%.2f")
-        
-        if st.button("Registrar Apuesta de Ventas"):
-            # Lógica para guardar en data/ventas_kpi.csv o Google Sheets
-            st.success(f"¡Registrado! Apostaste un {apuesta_v:.2f}%")
+    # Datos de ejemplo
+    data = {
+        'Usuario': ['Pedrito', 'Juancito', 'Federico', 'María'],
+        'Puntos Fútbol': [12, 15, 10, 14],
+        'Puntos KPI Ventas': [0, 0, 10, 0], # Federico ganó el día especial
+    }
+    
+    df = pd.DataFrame(data)
+    df['Total'] = df['Puntos Fútbol'] + df['Puntos KPI Ventas']
+    df = df.sort_values(by='Total', ascending=False)
+    
+    # Mostrar podio con métricas destacadas
+    col1, col2, col3 = st.columns(3)
+    col1.metric("1er Puesto", df.iloc[0]['Usuario'], f"{df.iloc[0]['Total']} pts")
+    col2.metric("2do Puesto", df.iloc[1]['Usuario'], f"{df.iloc[1]['Total']} pts")
+    
+    st.table(df)
 
-with tabs[2]:
-    st.header("🏆 Tabla de Posiciones")
-    # Aquí leerías los CSVs y mostrarías el DataFrame final ordenado por puntos
+# Ejecución de la pestaña de ranking
+mostrar_ranking()
