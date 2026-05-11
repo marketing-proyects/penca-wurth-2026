@@ -6,7 +6,7 @@ from datetime import datetime
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Penca Würth 2026", page_icon="⚽", layout="wide")
 
-# Conexión centralizada a Google Sheets
+# Conexión a Google Sheets (Asegúrate de tener el Secret configurado)
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 # --- ESTILOS CORPORATIVOS WÜRTH ---
@@ -16,7 +16,7 @@ st.markdown("""
     h1, h2, h3 { color: #ED1C24 !important; font-family: 'Arial Black', sans-serif; text-transform: uppercase; }
     .stButton>button { 
         background-color: #ED1C24; color: white; border-radius: 4px; 
-        width: 100%; border: none; font-weight: bold; height: 3em;
+        width: 100%; border: none; font-weight: bold; height: 3.5em;
     }
     .stButton>button:hover { background-color: #000000; color: white; }
     [data-testid="stMetricValue"] { color: #ED1C24; }
@@ -24,21 +24,23 @@ st.markdown("""
     .stTabs [data-baseweb="tab"] { 
         background-color: #f0f2f6; border-radius: 4px 4px 0 0; padding: 10px 20px; 
     }
+    /* Estilo para los contenedores de partidos */
+    .partido-card {
+        border-radius: 10px;
+        padding: 15px;
+        margin-bottom: 10px;
+        border-left: 8px solid #eee;
+    }
+    .partido-uruguay { border-left: 8px solid #ED1C24; background-color: #fff5f5; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- FUNCIONES DE LÓGICA ---
+# --- FUNCIONES DE LÓGICA DE DATOS ---
 
 def obtener_datos(pestana):
     try:
-        # ttl=0 asegura que siempre lea lo último de la planilla
         return conn.read(worksheet=pestana, ttl=0)
-    except Exception:
-        # Si la pestaña está vacía o falla, devolvemos un DataFrame vacío con columnas
-        if pestana == "apuestas":
-            return pd.DataFrame(columns=['usuario', 'partido_id', 'goles_local', 'goles_visitante', 'timestamp'])
-        if pestana == "ventas":
-            return pd.DataFrame(columns=['usuario', 'apuesta_porcentaje', 'timestamp'])
+    except:
         return pd.DataFrame()
 
 def calcular_puntos_futbol(row_apuesta, df_partidos):
@@ -48,105 +50,109 @@ def calcular_puntos_futbol(row_apuesta, df_partidos):
         return 0
     
     real_l, real_v = partido.iloc[0]['resultado_local'], partido.iloc[0]['resultado_visitante']
-    apuesta_l, apuesta_v = row_apuesta['goles_local'], row_apuesta['goles_visitante']
+    ap_l, ap_v = row_apuesta['goles_local'], row_apuesta['goles_visitante']
     
-    if real_l == apuesta_l and real_v == apuesta_v: return 3
-    if (real_l > real_v and apuesta_l > apuesta_v) or \
-       (real_l < real_v and apuesta_l < apuesta_v) or \
-       (real_l == real_v and apuesta_l == apuesta_v): return 1
+    if real_l == ap_l and real_v == ap_v: return 3 # Exacto
+    if (real_l > real_v and ap_l > ap_v) or \
+       (real_l < real_v and ap_l < ap_v) or \
+       (real_l == real_v and ap_l == ap_v): return 1 # Ganador/Empate
     return 0
 
-# --- ESTRUCTURA DE LA APP ---
-st.title("🏆 PENCA DIGITAL WÜRTH 2026")
-st.subheader("Market Intelligence Unit • Uruguay")
+# --- CABECERA ---
+with st.container():
+    col_l, col_r = st.columns([1, 5])
+    with col_l:
+        st.image("https://upload.wikimedia.org/wikipedia/commons/1/1e/Wuerth_Logo_2024.svg", width=120)
+    with col_r:
+        st.title("PENCA DIGITAL WÜRTH 2026")
+        st.markdown("**Market Intelligence Unit • Uruguay**")
 
-tab1, tab2, tab3 = st.tabs(["⚽ PRONÓSTICOS", "📊 DESAFÍO VENTAS", "🥇 RANKING GENERAL"])
+tab1, tab2, tab3 = st.tabs(["⚽ PRONÓSTICOS", "📊 DESAFÍO VENTAS", "🥇 RANKING"])
 
-# --- TAB 1: PRONÓSTICOS FÚTBOL ---
+# --- TAB 1: PRONÓSTICOS ---
 with tab1:
-    st.header("Fixture y Carga de Goles")
+    st.header("Fixture Mundialista")
     df_partidos = obtener_datos("partidos")
     ahora = datetime.now()
 
     if not df_partidos.empty:
-        with st.form("form_futbol"):
+        with st.form("form_penca"):
             usuario = st.text_input("Ingresa tu Nombre Completo:", placeholder="Ej: Diego_W")
             st.divider()
             
-            nuevas_apuestas = []
+            apuestas_lista = []
             for _, row in df_partidos.iterrows():
-                f_partido = datetime.strptime(f"{row['fecha']} {row['hora_uy']}", "%Y-%m-%d %H:%M")
-                bloqueado = ahora >= f_partido
+                # Destaque de Uruguay
+                es_uruguay = row['local'] == 'Uruguay' or row['visitante'] == 'Uruguay'
+                clase_card = "partido-uruguay" if es_uruguay else ""
                 
-                col1, col_vs, col2 = st.columns([2, 1, 2])
-                with col1:
+                # Bloqueo por tiempo
+                f_dt = datetime.strptime(f"{row['fecha']} {row['hora_uy']}", "%Y-%m-%d %H:%M")
+                bloqueado = ahora >= f_dt
+
+                st.markdown(f"<div class='partido-card {clase_card}'>", unsafe_allow_html=True)
+                c1, c_vs, c2 = st.columns([2, 1, 2])
+                with c1:
                     st.write(f"**{row['local']}**")
                     g_l = st.number_input("Goles", 0, 20, 0, key=f"l_{row['id']}", disabled=bloqueado)
-                with col_vs:
-                    st.markdown(f"<p style='text-align:center; padding-top:25px;'>{row['hora_uy']}hs</p>", unsafe_allow_html=True)
-                with col2:
+                with c_vs:
+                    st.markdown(f"<p style='text-align:center; padding-top:20px;'>{row['hora_uy']} hs</p>", unsafe_allow_html=True)
+                with c2:
                     st.write(f"**{row['visitante']}**")
                     g_v = st.number_input("Goles", 0, 20, 0, key=f"v_{row['id']}", disabled=bloqueado)
+                st.markdown("</div>", unsafe_allow_html=True)
                 
-                nuevas_apuestas.append([usuario, row['id'], g_l, g_v, ahora.strftime("%Y-%m-%d %H:%M")])
-                st.divider()
-
+                apuestas_lista.append([usuario, row['id'], g_l, g_v, ahora.strftime("%Y-%m-%d %H:%M")])
+            
             if st.form_submit_button("GUARDAR MIS PRONÓSTICOS"):
                 if usuario:
-                    df_apuestas_nuevas = pd.DataFrame(nuevas_apuestas, columns=['usuario', 'partido_id', 'goles_local', 'goles_visitante', 'timestamp'])
-                    df_actual = obtener_datos("apuestas")
-                    df_final = pd.concat([df_actual, df_apuestas_nuevas], ignore_index=True)
-                    conn.update(worksheet="apuestas", data=df_final)
-                    st.success("✅ ¡Pronósticos guardados exitosamente!")
-                else:
-                    st.error("⚠️ Debes ingresar tu nombre.")
-    else:
-        st.warning("No se encontraron partidos cargados en la planilla.")
+                    df_new = pd.DataFrame(apuestas_lista, columns=['usuario','partido_id','goles_local','goles_visitante','timestamp'])
+                    df_old = obtener_datos("apuestas")
+                    conn.update(worksheet="apuestas", data=pd.concat([df_old, df_new], ignore_index=True))
+                    st.success("⚽ ¡Pronósticos guardados!")
+                else: st.error("Ingresa tu nombre")
+    else: st.warning("Carga los partidos en la planilla 'partidos'.")
 
-# --- TAB 2: KPI VENTAS ---
+# --- TAB 2: VENTAS ---
 with tab2:
-    st.header("🎯 Bono de Precisión: Día de Ventas")
-    with st.form("form_ventas"):
-        u_v = st.text_input("Tu Nombre:", key="u_v")
-        val_v = st.number_input("¿Qué % de cumplimiento haremos?", 0.00, 300.00, 100.00, step=0.01, format="%.2f")
-        
-        if st.form_submit_button("REGISTRAR APUESTA DE VENTAS"):
+    st.header("🎯 Bono Especial: Día de Ventas")
+    st.write("Apostá al cumplimiento final del objetivo (2 decimales).")
+    with st.form("form_v"):
+        u_v = st.text_input("Nombre:", key="v_name")
+        val_v = st.number_input("Cumplimiento (%)", 0.00, 300.00, 100.00, step=0.01, format="%.2f")
+        if st.form_submit_button("REGISTRAR APUESTA VENTAS"):
             if u_v:
-                df_v_nuevas = pd.DataFrame([[u_v, val_v, ahora.strftime("%Y-%m-%d %H:%M")]], columns=['usuario', 'apuesta_porcentaje', 'timestamp'])
-                df_v_actual = obtener_datos("ventas")
-                df_v_final = pd.concat([df_v_actual, df_v_nuevas], ignore_index=True)
-                conn.update(worksheet="ventas", data=df_v_final)
+                df_v_new = pd.DataFrame([[u_v, val_v, ahora.strftime("%Y-%m-%d %H:%M")]], columns=['usuario','apuesta_porcentaje','timestamp'])
+                df_v_old = obtener_datos("ventas")
+                conn.update(worksheet="ventas", data=pd.concat([df_v_old, df_v_new], ignore_index=True))
                 st.success(f"🎯 Registrado: {val_v}%")
-            else:
-                st.error("⚠️ Falta tu nombre.")
+            else: st.error("Ingresa tu nombre")
 
-# --- TAB 3: RANKING GENERAL ---
+# --- TAB 3: RANKING ---
 with tab3:
-    st.header("🥇 Tabla de Posiciones")
+    st.header("🥇 Posiciones Generales")
     df_p = obtener_datos("partidos")
     df_a = obtener_datos("apuestas")
     df_v = obtener_datos("ventas")
     
-    # Solo procesamos si hay apuestas (evita el bucle de error)
     if not df_a.empty and 'usuario' in df_a.columns:
         df_a['puntos'] = df_a.apply(lambda x: calcular_puntos_futbol(x, df_p), axis=1)
-        ranking_f = df_a.groupby('usuario')['puntos'].sum().reset_index()
+        rank = df_a.groupby('usuario')['puntos'].sum().reset_index()
         
-        RESULTADO_REAL_VENTAS = 101.60 
+        # Valor real del KPI (Se edita aquí cuando se sepa)
+        VALOR_REAL_KPI = 101.60 
         
         if not df_v.empty and 'usuario' in df_v.columns:
-            df_v['error'] = abs(df_v['apuesta_porcentaje'] - RESULTADO_REAL_VENTAS).round(2)
-            error_min = df_v['error'].min()
-            df_v['puntos_v'] = df_v['error'].apply(lambda x: 10 if x == error_min else 0)
-            ranking_v = df_v.groupby('usuario')['puntos_v'].sum().reset_index()
-            
-            ranking_final = pd.merge(ranking_f, ranking_v, on='usuario', how='outer').fillna(0)
-            ranking_final['Total'] = ranking_final['puntos'] + ranking_final['puntos_v']
+            df_v['err'] = abs(df_v['apuesta_porcentaje'] - VALOR_REAL_KPI).round(2)
+            min_err = df_v['err'].min()
+            df_v['puntos_v'] = df_v['err'].apply(lambda x: 10 if x == min_err else 0)
+            rank_v = df_v.groupby('usuario')['puntos_v'].sum().reset_index()
+            rank = pd.merge(rank, rank_v, on='usuario', how='outer').fillna(0)
+            rank['Total'] = rank['puntos'] + rank['puntos_v']
         else:
-            ranking_final = ranking_f
-            ranking_final['Total'] = ranking_final['puntos']
-
-        ranking_final = ranking_final.sort_values(by='Total', ascending=False)
-        st.table(ranking_final[['usuario', 'Total']].rename(columns={'usuario': 'Participante', 'Total': 'Puntos'}))
+            rank['Total'] = rank['puntos']
+            
+        rank = rank.sort_values(by='Total', ascending=False)
+        st.table(rank[['usuario', 'Total']].rename(columns={'usuario': 'Participante', 'Total': 'Puntos'}))
     else:
-        st.info("Aún no hay apuestas registradas para mostrar el ranking.")
+        st.info("Aún no hay apuestas registradas.")
