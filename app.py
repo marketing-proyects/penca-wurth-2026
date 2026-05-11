@@ -14,46 +14,39 @@ st.set_page_config(
 # Conexión a Google Sheets
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# --- 2. CSS DE ALTA PRIORIDAD (FORZADO DE CAPAS) ---
+# --- 2. CSS: ESTILO INTEGRADO (Inspirado en Puntos Würth) ---
 st.markdown("""
     <style>
-    /* 1. OCULTAR TODO LO QUE NO SEA NUESTRO LIENZO */
+    /* Ocultar elementos nativos de Streamlit */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
     [data-testid="stHeader"] {display: none;}
     
-    /* 2. FONDO TOTAL (CAPA INFERIOR) */
+    /* CAPA DE FONDO: Imagen con opacidad fundida */
     .stApp {
-        background: linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)), 
+        background: linear-gradient(rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.85)), 
                     url("https://images.unsplash.com/photo-1574629810360-7efbbe195018?q=80&w=2093&auto=format&fit=crop");
         background-size: cover;
         background-position: center;
         background-attachment: fixed;
     }
 
-    /* 3. FORZAR TRANSPARENCIA EN CONTENEDORES INTERMEDIOS DE STREAMLIT */
-    [data-testid="stVerticalBlock"] > div {
-        background-color: transparent !important;
+    /* CONTENEDOR MAESTRO (Sin bordes pesados, integrado al fondo) */
+    .master-container {
+        max-width: 1000px;
+        margin: 0 auto;
+        padding-top: 50px;
+        text-align: center;
     }
 
-    /* 4. EL LIENZO MAESTRO BLANCO (CAPA SUPERIOR) */
-    .master-canvas {
-        background-color: white !important;
-        padding: 50px;
-        border-radius: 10px;
-        box-shadow: 0 20px 60px rgba(0,0,0,0.7);
-        margin: 20px auto;
-        max-width: 1100px;
-        min-height: 85vh;
-        z-index: 99;
-    }
-
-    /* EL AIRE DEL LOGO JPG */
+    /* MARCO DEL LOGO (Resaltado sobre el fondo fundido) */
     .logo-frame {
-        padding: 2px;
         background-color: white;
+        padding: 10px;
+        border-radius: 8px;
         display: inline-block;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
         margin-bottom: 20px;
     }
 
@@ -61,42 +54,55 @@ st.markdown("""
     
     .main-title {
         color: #ED1C24;
-        font-size: 42px;
+        font-size: 48px;
         font-family: 'Arial Black', sans-serif;
-        line-height: 1.1;
-        margin: 0;
+        margin-bottom: 40px;
+        letter-spacing: -1px;
     }
     
-    /* Tabs dentro del lienzo blanco */
-    .stTabs [data-baseweb="tab-list"] { gap: 10px; border-bottom: 2px solid #f0f2f6; }
+    /* Estilo de los Tabs (Limpio y minimalista) */
+    .stTabs [data-baseweb="tab-list"] { 
+        justify-content: center; 
+        background-color: transparent;
+        border-bottom: 2px solid #ED1C24;
+    }
     .stTabs [data-baseweb="tab"] { 
-        background-color: #f8f9fa; border-radius: 4px 4px 0 0; padding: 12px 25px; font-weight: bold;
+        background-color: rgba(255,255,255,0.5); 
+        border-radius: 8px 8px 0 0; 
+        padding: 10px 30px; 
+        font-weight: bold;
+        color: #333;
+    }
+    .stTabs [aria-selected="true"] { 
+        background-color: #ED1C24 !important; 
+        color: white !important; 
+    }
+
+    /* Inputs y Formularios integrados */
+    .stTextInput>div>div>input, .stNumberInput>div>div>input {
+        background-color: rgba(255,255,255,0.9) !important;
+        border: 1px solid #ddd !important;
     }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. RENDERIZADO DEL LIENZO MAESTRO ---
+# --- 3. RENDERIZADO ---
 
-# Este div DEBE envolver absolutamente todo lo que sigue
-st.markdown('<div class="master-canvas">', unsafe_allow_html=True)
+# Abrimos el contenedor principal
+st.markdown('<div class="master-container">', unsafe_allow_html=True)
 
-# Cabecera
-col_log, col_tit = st.columns([1, 3])
+# Logo Centrado (como en Puntos Würth)
+st.markdown('<div class="logo-frame">', unsafe_allow_html=True)
+if os.path.exists("logo_wurth.jpg"):
+    st.image("logo_wurth.jpg", width=250)
+else:
+    st.write("### WÜRTH")
+st.markdown('</div>', unsafe_allow_html=True)
 
-with col_log:
-    st.markdown('<div class="logo-frame">', unsafe_allow_html=True)
-    if os.path.exists("logo_wurth.jpg"):
-        st.image("logo_wurth.jpg", width=220)
-    else:
-        st.write("### WÜRTH")
-    st.markdown('</div>', unsafe_allow_html=True)
+# Título Principal
+st.markdown("<h1 class='main-title'>PENCA DIGITAL WÜRTH 2026</h1>", unsafe_allow_html=True)
 
-with col_tit:
-    st.markdown("<h1 class='main-title'>PENCA DIGITAL<br>WÜRTH 2026</h1>", unsafe_allow_html=True)
-
-st.write("---")
-
-# Contenido Interactivo
+# Pestañas de Navegación
 tab1, tab2, tab3 = st.tabs(["⚽ PRONÓSTICOS", "📊 DESAFÍO VENTAS", "🥇 RANKING"])
 
 def obtener_datos(pestana):
@@ -104,12 +110,14 @@ def obtener_datos(pestana):
     except: return pd.DataFrame()
 
 with tab1:
-    st.header("FIXTURE MUNDIALISTA")
+    st.markdown("<br>", unsafe_allow_html=True)
     df_p = obtener_datos("partidos")
     if not df_p.empty:
-        st.info("Fixture cargado desde GSheets.")
+        # Aquí insertamos la carga de partidos en un contenedor con opacidad
+        with st.container():
+            st.info("El fixture se encuentra disponible para completar.")
     else:
-        st.warning("No hay partidos en la planilla 'partidos'.")
+        st.warning("Sin partidos cargados en la base de datos.")
 
-# IMPORTANTE: Cerramos el lienzo maestro al FINAL de todo el código
+# Cerramos el contenedor maestro
 st.markdown('</div>', unsafe_allow_html=True)
