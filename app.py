@@ -1,139 +1,87 @@
 import streamlit as st
+from streamlit_gsheets import GSheetsConnection
 import pandas as pd
-import os
 from datetime import datetime
 
-# --- CONFIGURACIÓN DE PÁGINA ---
-st.set_page_config(page_title="Penca Würth 2026", page_icon="⚽", layout="wide")
+# --- CONFIGURACIÓN ---
+st.set_page_config(page_title="Penca Würth 2026", layout="wide")
 
-# --- ESTILOS CORPORATIVOS WÜRTH ---
+# Conexión a la base de datos (Google Sheets)
+conn = st.connection("gsheets", type=GSheetsConnection)
+
+# --- ESTILOS WÜRTH ---
 st.markdown("""
     <style>
     .stApp { background-color: #FFFFFF; }
     h1, h2, h3 { color: #ED1C24 !important; font-family: 'Arial Black', sans-serif; }
-    .stButton>button { 
-        background-color: #ED1C24; color: white; border-radius: 4px; 
-        width: 100%; border: none; font-weight: bold;
-    }
-    .stButton>button:hover { background-color: #000000; color: white; }
-    .stMetric { background-color: #f8f9fa; padding: 15px; border-radius: 10px; border-left: 5px solid #ED1C24; }
+    .stButton>button { background-color: #ED1C24; color: white; border: none; font-weight: bold; width: 100%; }
+    .stButton>button:hover { background-color: #000000; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- FUNCIONES DE LÓGICA DE DATOS ---
-def guardar_datos(df_nuevo, archivo):
-    path = f'data/{archivo}'
-    if not os.path.exists('data'):
-        os.makedirs('data')
-    
-    if os.path.exists(path):
-        df_hist = pd.read_csv(path)
-        df_final = pd.concat([df_hist, df_nuevo], ignore_index=True)
-    else:
-        df_final = df_nuevo
-    
-    df_final.to_csv(path, index=False)
+# --- CARGA DE DATOS ---
+def get_partidos():
+    return conn.read(worksheet="partidos")
 
-def cargar_partidos():
-    return pd.read_csv('data/partidos.csv')
-
-# --- INTERFAZ PRINCIPAL ---
+# --- INTERFAZ ---
 st.title("🏆 PENCA DIGITAL WÜRTH 2026")
-st.subheader("Market Intelligence Unit - Uruguay")
 
 tab1, tab2, tab3 = st.tabs(["⚽ PRONÓSTICOS", "📊 KPI VENTAS", "🥇 RANKING"])
 
-# --- TAB 1: PRONÓSTICOS DE FÚTBOL ---
 with tab1:
     st.header("Carga de Partidos")
-    df_partidos = cargar_partidos()
+    df_partidos = get_partidos()
     ahora = datetime.now()
-
+    
     with st.form("penca_futbol"):
-        usuario = st.text_input("Nombre / Legajo:", placeholder="Ej: Diego_W")
-        st.divider()
+        usuario = st.text_input("Tu Nombre/Legajo:")
         
-        apuestas_temporales = []
-        
-        for idx, row in df_partidos.iterrows():
-            col1, col_vs, col2 = st.columns([2, 1, 2])
+        apuestas_form = []
+        for _, row in df_partidos.iterrows():
+            # Validación de bloqueo (hora Uruguay)
+            fecha_dt = datetime.strptime(f"{row['fecha']} {row['hora_uy']}", "%Y-%m-%d %H:%M")
+            bloqueado = ahora >= fecha_dt
             
-            # Lógica de bloqueo (Ejemplo: 1 hora antes)
-            fecha_str = f"{row['fecha']} {row['hora_uy']}"
-            fecha_dt = datetime.strptime(fecha_str, "%Y-%m-%d %H:%M")
-            bloqueado = ahora >= fecha_dt 
-
-            with col1:
-                st.write(f"**{row['local']}**")
-                g_l = st.number_input("Goles", 0, 20, 0, key=f"l_{row['id']}", disabled=bloqueado)
+            col1, col2, col3 = st.columns([2,1,2])
+            with col1: st.write(f"**{row['local']}**"); g_l = st.number_input("Goles", 0, 20, 0, key=f"l_{row['id']}", disabled=bloqueado)
+            with col2: st.markdown("<p style='text-align:center;'>VS</p>", unsafe_allow_html=True)
+            with col3: st.write(f"**{row['visitante']}**"); g_v = st.number_input("Goles", 0, 20, 0, key=f"v_{row['id']}", disabled=bloqueado)
             
-            with col_vs:
-                st.markdown(f"<p style='text-align:center; font-size:20px;'>VS</p>", unsafe_allow_html=True)
-                st.caption(f"{row['hora_uy']} hs")
-            
-            with col2:
-                st.write(f"**{row['visitante']}**")
-                g_v = st.number_input("Goles", 0, 20, 0, key=f"v_{row['id']}", disabled=bloqueado)
-            
-            apuestas_temporales.append({
-                "usuario": usuario, "partido_id": row['id'], 
-                "goles_local": g_l, "goles_visitante": g_v, 
-                "timestamp": ahora.strftime("%Y-%m-%d %H:%M")
-            })
+            apuestas_form.append([usuario, row['id'], g_l, g_v, ahora.strftime("%Y-%m-%d %H:%M")])
             st.divider()
 
-        btn_futbol = st.form_submit_button("GUARDAR PRONÓSTICOS")
-        
-        if btn_futbol:
+        if st.form_submit_button("GUARDAR PRONÓSTICOS"):
             if usuario:
-                df_apuestas = pd.DataFrame(apuestas_temporales)
-                guardar_datos(df_apuestas, 'apuestas.csv')
-                st.success(f"✅ Pronósticos de {usuario} guardados localmente.")
+                # Escribir en la hoja 'apuestas'
+                df_apuestas = pd.DataFrame(apuestas_form, columns=['usuario', 'partido_id', 'goles_local', 'goles_visitante', 'timestamp'])
+                # Leer existentes y concatenar
+                df_prev = conn.read(worksheet="apuestas")
+                df_final = pd.concat([df_prev, df_apuestas], ignore_index=True)
+                conn.update(worksheet="apuestas", data=df_final)
+                st.success("✅ ¡Pronósticos guardados en la nube!")
             else:
-                st.error("⚠️ Por favor ingresa tu nombre.")
+                st.error("Ingresa tu nombre")
 
-# --- TAB 2: KPI VENTAS (EL DÍA ESPECIAL) ---
 with tab2:
     st.header("🎯 Desafío Especial de Ventas")
-    st.write("KPI: Crecimiento de Pedidos por Vendedor (Junio 2026 vs 2025)")
-    
     with st.form("penca_ventas"):
-        user_v = st.text_input("Tu Nombre:", key="user_v")
-        st.write("### ¿Cuál será el % de cumplimiento del día especial?")
-        apuesta_val = st.number_input("Ingresa el porcentaje (ej: 101.60)", 
-                                      min_value=0.00, max_value=300.00, 
-                                      value=100.00, step=0.01, format="%.2f")
+        u_v = st.text_input("Nombre:")
+        val = st.number_input("Cumplimiento esperado (%)", 0.00, 300.00, 100.00, step=0.01, format="%.2f")
         
-        btn_ventas = st.form_submit_button("REGISTRAR APUESTA DE VENTAS")
-        
-        if btn_ventas:
-            if user_v:
-                df_v = pd.DataFrame([{
-                    "usuario": user_v, 
-                    "apuesta_porcentaje": apuesta_val, 
-                    "timestamp": ahora.strftime("%Y-%m-%d %H:%M")
-                }])
-                guardar_datos(df_v, 'ventas_kpi.csv')
-                st.success(f"🎯 Apuesta de {apuesta_val}% registrada para {user_v}")
-            else:
-                st.error("⚠️ Ingresa tu nombre.")
+        if st.form_submit_button("REGISTRAR APUESTA"):
+            df_v = pd.DataFrame([[u_v, val, ahora.strftime("%Y-%m-%d %H:%M")]], columns=['usuario', 'apuesta_porcentaje', 'timestamp'])
+            df_v_prev = conn.read(worksheet="ventas")
+            df_v_final = pd.concat([df_v_prev, df_v], ignore_index=True)
+            conn.update(worksheet="ventas", data=df_v_final)
+            st.success(f"Registrado: {val}%")
 
-# --- TAB 3: RANKING (VISUALIZACIÓN LOCAL) ---
 with tab3:
-    st.header("🥇 Posiciones en Tiempo Real")
-    
-    col_rank1, col_rank2 = st.columns(2)
-    
-    with col_rank1:
-        st.subheader("Últimas Apuestas Fútbol")
-        if os.path.exists('data/apuestas.csv'):
-            st.dataframe(pd.read_csv('data/apuestas.csv').tail(10))
-        else:
-            st.info("No hay datos de fútbol aún.")
-
-    with col_rank2:
-        st.subheader("Apuestas de Ventas")
-        if os.path.exists('data/ventas_kpi.csv'):
-            st.dataframe(pd.read_csv('data/ventas_kpi.csv').tail(10))
-        else:
-            st.info("No hay datos de ventas aún.")
+    st.header("🥇 Posiciones")
+    # Mostrar tablas de la nube
+    col_a, col_b = st.columns(2)
+    with col_a:
+        st.subheader("Fútbol")
+        st.dataframe(conn.read(worksheet="apuestas").tail(10))
+    with col_b:
+        st.subheader("Ventas")
+        st.dataframe(conn.read(worksheet="ventas").tail(10))
