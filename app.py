@@ -42,7 +42,7 @@ st.markdown("""
     .logo-frame {
         background-color: white;
         padding: 4px;
-        display: inline-block;
+        display: outline-block;
         margin-bottom: 10px;
     }
 
