@@ -14,7 +14,7 @@ st.set_page_config(
 # Conexión a Google Sheets
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# --- 2. CSS: CAPAS INDEPENDIENTES ---
+# --- 2. CSS: ARQUITECTURA DE CAPAS (Lienzo Único) ---
 st.markdown("""
     <style>
     /* Ocultar elementos nativos de Streamlit */
@@ -23,32 +23,33 @@ st.markdown("""
     header {visibility: hidden;}
     [data-testid="stHeader"] {display: none;}
     
-    /* CAPA 0: FONDO (Detrás de todo) */
+    /* CAPA 0: FONDO TOTAL */
     .stApp {
-        background: linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), 
+        background: linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)), 
                     url("https://images.unsplash.com/photo-1574629810360-7efbbe195018?q=80&w=2093&auto=format&fit=crop");
         background-size: cover;
         background-position: center;
         background-attachment: fixed;
     }
     
-    /* CAPA 1: EL CUADRO BLANCO (Lienzo interactivo) */
-    .penca-canvas {
+    /* CAPA 1: EL LIENZO BLANCO (Contenedor Maestro) */
+    /* Este contenedor obliga a que todo lo de adentro tenga fondo blanco sólido */
+    .master-canvas {
         background-color: white;
-        padding: 45px;
-        border-radius: 12px;
-        box-shadow: 0 15px 35px rgba(0,0,0,0.4);
-        margin: 50px auto; /* Centrado y con aire arriba/abajo */
+        padding: 40px;
+        border-radius: 15px;
+        box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+        margin: 40px auto;
         max-width: 1100px;
-        min-height: 80vh;
+        min-height: 85vh;
     }
 
-    /* EL AIRE DEL LOGO (Margen de 1px/2px sobre fondo blanco) */
-    .logo-wrapper {
+    /* EL AIRE DEL LOGO */
+    .logo-box {
         padding: 2px;
         display: inline-block;
         background-color: white;
-        margin-bottom: 25px;
+        margin-bottom: 20px;
     }
 
     h1, h2, h3 { color: #ED1C24 !important; font-family: 'Arial Black', sans-serif; text-transform: uppercase; }
@@ -57,40 +58,40 @@ st.markdown("""
         color: #ED1C24;
         font-size: 42px;
         font-family: 'Arial Black', sans-serif;
-        margin: 0;
-        line-height: 1.2;
+        line-height: 1.1;
+        margin-top: 10px;
     }
 
-    /* Estilo de los Tabs dentro del lienzo blanco */
+    /* Tabs dentro del lienzo */
     .stTabs [data-baseweb="tab-list"] { gap: 10px; border-bottom: 2px solid #f0f2f6; }
     .stTabs [data-baseweb="tab"] { 
-        background-color: #f8f9fa; border-radius: 4px 4px 0 0; padding: 12px 30px; font-weight: bold;
+        background-color: #f8f9fa; border-radius: 4px 4px 0 0; padding: 12px 25px; font-weight: bold;
     }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. RENDERIZADO DEL LIENZO PRINCIPAL ---
+# --- 3. RENDERIZADO DEL LIENZO MAESTRO ---
 
-# Todo lo que escribamos dentro de este DIV aparecerá sobre el cuadro blanco
-st.markdown('<div class="penca-canvas">', unsafe_allow_html=True)
+# Abrimos el contenedor que atrapará TODO el contenido
+st.markdown('<div class="master-canvas">', unsafe_allow_html=True)
 
-# Layout de Cabecera
-col_log, col_tit = st.columns([1, 3])
+# Cabecera integrada
+col_logo, col_titulo = st.columns([1, 3])
 
-with col_log:
-    st.markdown('<div class="logo-wrapper">', unsafe_allow_html=True)
+with col_logo:
+    st.markdown('<div class="logo-box">', unsafe_allow_html=True)
     if os.path.exists("logo_wurth.jpg"):
         st.image("logo_wurth.jpg", width=220)
     else:
         st.write("### WÜRTH")
     st.markdown('</div>', unsafe_allow_html=True)
 
-with col_tit:
+with col_titulo:
     st.markdown("<h1 class='main-title'>PENCA DIGITAL<br>WÜRTH 2026</h1>", unsafe_allow_html=True)
 
 st.write("---")
 
-# Estructura de Pestañas
+# Pestañas
 tab1, tab2, tab3 = st.tabs(["⚽ PRONÓSTICOS", "📊 DESAFÍO VENTAS", "🥇 RANKING"])
 
 def obtener_datos(pestana):
@@ -101,9 +102,10 @@ with tab1:
     st.header("FIXTURE MUNDIALISTA")
     df_partidos = obtener_datos("partidos")
     if not df_partidos.empty:
-        st.write("Partidos listos para pronosticar.")
+        # Aquí puedes insertar el formulario de pronósticos que teníamos
+        st.info("Fixture listo para pronosticar.")
     else:
-        st.info("Carga partidos en tu Google Sheet para ver el fixture.")
+        st.warning("Carga los partidos en la planilla 'partidos' del Excel.")
 
-# Cerramos el lienzo blanco (Capas separadas correctamente)
+# Cerramos el contenedor maestro
 st.markdown('</div>', unsafe_allow_html=True)
