@@ -14,7 +14,7 @@ st.set_page_config(
 # Conexión a Google Sheets
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# --- 2. CSS: ESTILO CEREBRO CON FONDO GRADUAL ---
+# --- 2. CSS: ESTILO CEREBRO / GRADIENTE DIRECCIONAL ---
 st.markdown("""
     <style>
     #MainMenu {visibility: hidden;}
@@ -35,7 +35,6 @@ st.markdown("""
         background-attachment: fixed;
     }
 
-    /* Blindaje Logo Técnica CEREBRO */
     [data-testid="stImage"] img { border-radius: 0px !important; }
     .logo-box-cerebro {
         background-color: white !important;
@@ -50,27 +49,20 @@ st.markdown("""
     h1, h2, h3 { color: #ED1C24 !important; font-family: 'Arial Black', sans-serif; text-transform: uppercase; }
     .main-title { color: #ED1C24; font-size: 42px; font-family: 'Arial Black', sans-serif; margin: 0 0 30px 0; letter-spacing: -1px; }
     
-    /* Tabs Corporativos */
     .stTabs [data-baseweb="tab-list"] { gap: 12px; border-bottom: 2px solid #ED1C24; }
     .stTabs [data-baseweb="tab"] { background-color: rgba(255, 255, 255, 0.5); border-radius: 4px 4px 0 0; padding: 12px 25px; font-weight: bold; }
     .stTabs [aria-selected="true"] { background-color: #ED1C24 !important; color: white !important; }
-    
-    /* Estilo de filas de partidos */
-    .partido-row {
-        background-color: rgba(255, 255, 255, 0.7);
-        padding: 15px;
-        border-radius: 8px;
-        margin-bottom: 10px;
-        border-left: 5px solid #ED1C24;
-    }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. FUNCIONES DE DATOS ---
+# --- 3. FUNCIONES DE DATOS (CON LIMPIEZA) ---
 def obtener_datos(pestana):
     try:
-        # ttl=0 asegura que traiga los datos reales del Excel al recargar
-        return conn.read(worksheet=pestana, ttl=0)
+        # ttl=0 para forzar lectura fresca
+        df = conn.read(worksheet=pestana, ttl=0)
+        # Limpieza: eliminar columnas o filas vacías que ensucian la lectura
+        df = df.dropna(how='all', axis=0).dropna(how='all', axis=1)
+        return df
     except Exception:
         return pd.DataFrame()
 
@@ -91,18 +83,23 @@ with tab1:
     st.markdown("<br>", unsafe_allow_html=True)
     df_partidos = obtener_datos("partidos")
 
-    if not df_partidos.empty:
+    # Verificamos si el DataFrame tiene datos y las columnas necesarias
+    columnas_req = ['id', 'local', 'visitante']
+    if not df_partidos.empty and all(col in df_partidos.columns for col in columnas_req):
         with st.form("form_penca"):
-            usuario = st.text_input("Participante:", placeholder="Tu nombre")
+            usuario = st.text_input("Participante:", placeholder="Ingresa tu nombre")
             st.divider()
             
             respuestas = []
             for _, row in df_partidos.iterrows():
-                # Renderizado de fila de partido
                 col1, col2 = st.columns([3, 2])
                 with col1:
                     st.markdown(f"**{row['local']} vs {row['visitante']}**")
-                    st.caption(f"{row['fecha']} | {row['hora_uy']} hs")
+                    # Manejo de columnas opcionales para evitar errores
+                    fecha = row.get('fecha', 'TBD')
+                    hora = row.get('hora_uy', '--:--')
+                    st.caption(f"{fecha} | {hora} hs")
+                
                 with col2:
                     c1, c2 = st.columns(2)
                     g_l = c1.number_input("L", 0, 20, 0, key=f"l_{row['id']}")
@@ -121,21 +118,29 @@ with tab1:
                 if usuario:
                     try:
                         df_nuevas = pd.DataFrame(respuestas)
-                        df_existentes = obtener_datos("apuestas")
-                        df_final = pd.concat([df_existentes, df_nuevas], ignore_index=True)
+                        # Intentar leer apuestas previas para no sobreescribir todo el archivo
+                        try:
+                            df_viejas = obtener_datos("apuestas")
+                            df_final = pd.concat([df_viejas, df_nuevas], ignore_index=True)
+                        except:
+                            df_final = df_nuevas
+                            
                         conn.update(worksheet="apuestas", data=df_final)
-                        st.success(f"✅ ¡Pronósticos guardados correctamente, {usuario}!")
-                    except:
-                        st.error("Error al guardar. Asegúrate de tener una pestaña llamada 'apuestas'.")
+                        st.success(f"✅ ¡Pronósticos guardados, {usuario}!")
+                    except Exception as e:
+                        st.error(f"Error al guardar: {e}")
                 else:
-                    st.error("⚠️ Por favor ingresa tu nombre.")
+                    st.error("⚠️ El nombre es obligatorio.")
     else:
-        st.warning("⚠️ No se encontraron partidos. Verifica que la pestaña 'partidos' tenga datos y que las columnas sean: id, fecha, hora_uy, local, visitante.")
+        # Si el DataFrame llega vacío o con columnas mal nombradas
+        st.warning("⚠️ No se detectan datos válidos.")
+        st.write("Columnas detectadas en el Excel:", list(df_partidos.columns))
+        st.info("Asegúrate de que la primera fila del Excel tenga exactamente: id, fecha, hora_uy, local, visitante.")
 
 with tab2:
     st.header("🎯 Desafío Ventas")
-    st.info("Próximamente disponible.")
+    st.info("Módulo en desarrollo.")
 
 with tab3:
     st.header("🥇 Ranking")
-    st.info("El ranking se actualizará al finalizar los partidos.")
+    st.info("Se habilitará al comenzar el torneo.")
