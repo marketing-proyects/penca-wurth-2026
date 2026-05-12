@@ -7,8 +7,8 @@ import os
 # --- 1. CONFIGURACIÓN ---
 st.set_page_config(page_title="Penca Würth 2026", page_icon="⚽", layout="wide")
 
-# URL RAW DE GITHUB PARA RESULTADOS (Actualiza con tu enlace real)
-URL_RESULTADOS_REALES = "https://raw.githubusercontent.com/tu_usuario/tu_repo/main/resultados_reales_mundial_2026.xlsx"
+# URL RAW DE GITHUB PARA RESULTADOS (Para la fase final de Ranking)
+URL_RESULTADOS_REALES = "https://raw.githubusercontent.com/tu_usuario/tu_repo/main/resultados.xlsx"
 
 def init_db():
     conn = sqlite3.connect('penca.db')
@@ -21,57 +21,56 @@ def init_db():
 
 init_db()
 
-# --- 2. FIXTURE INTEGRAL (72 Partidos de Grupos A al L) ---
+# --- 2. FIXTURE INTEGRAL (72 Partidos de Grupos A al L - Sin Emojis) ---
 def cargar_fixture():
     groups_data = {
-        "A": ["México 🇲🇽", "Sudáfrica 🇿🇦", "Corea del Sur 🇰🇷", "Rep. Checa 🇨🇿"],
-        "B": ["Canadá 🇨🇦", "Bosnia 🇧🇦", "Qatar 🇶🇦", "Suiza 🇨🇭"],
-        "C": ["Brasil 🇧🇷", "Haití 🇭🇹", "Marruecos 🇲🇦", "Escocia 🏴󠁧󠁢󠁳󠁣󠁴󠁿"],
-        "D": ["EE. UU. 🇺🇸", "Turquía 🇹🇷", "Australia 🇦🇺", "Paraguay 🇵🇾"],
-        "E": ["Alemania 🇩🇪", "Curazao 🇨🇼", "C. Marfil 🇨🇮", "Ecuador 🇪🇨"],
-        "F": ["España 🇪🇸", "Cabo Verde 🇨🇻", "Arabia Saudita 🇸🇦", "Uruguay 🇺🇾"],
-        "G": ["Bélgica 🇧🇪", "Egipto 🇪🇬", "Irán 🇮🇷", "N. Zelanda 🇳🇿"],
-        "H": ["P. Bajos 🇳🇱", "Japón 🇯🇵", "Suecia 🇸🇪", "Túnez 🇹🇳"],
-        "I": ["Portugal 🇵🇹", "Ghana 🇬🇭", "Polonia 🇵🇱", "Panamá 🇵🇦"],
-        "J": ["Argentina 🇦🇷", "Argelia 🇩🇿", "Austria 🇦🇹", "Jordania 🇯🇴"],
-        "K": ["Francia 🇫🇷", "Perú 🇵🇪", "Nigeria 🇳🇬", "Eslovenia 🇸🇮"],
-        "L": ["Inglaterra 🏴󠁧󠁢󠁥󠁮󠁧󠁿", "Croacia 🇭🇷", "Senegal 🇸🇳", "China 🇨🇳"]
+        "A": ["México", "Sudáfrica", "Corea del Sur", "Rep. Checa"],
+        "B": ["Canadá", "Bosnia", "Qatar", "Suiza"],
+        "C": ["Brasil", "Haití", "Marruecos", "Escocia"],
+        "D": ["EE. UU.", "Turquía", "Australia", "Paraguay"],
+        "E": ["Alemania", "Curazao", "C. Marfil", "Ecuador"],
+        "F": ["P. Bajos", "Japón", "Suecia", "Tunéz"],
+        "G": ["Bélgica", "Egipto", "Irán", "N. Zelanda"],
+        "H": ["España", "Cabo Verde", "Arabia Saudita", "Uruguay"],
+        "I": ["Francia", "Senegal", "Irak", "Noruega"],
+        "J": ["Austria", "Jordania", "Argentina", "Argelia"],
+        "K": ["Portugal", "RD Congo", "Uzbekistán", "Colombia"],
+        "L": ["Inglaterra", "Croacia", "Ghana", "Panamá"]
     }
     
     matches = []
     match_id = 1
+    # Generamos los partidos siguiendo el flujo del calendario (Días 11 al 27 Jun)
     for group_name, teams in groups_data.items():
-        # Calendario base (6 partidos por grupo)
-        group_matches = [
-            (teams[0], teams[1], "11/06", "18:00"),
-            (teams[2], teams[3], "11/06", "22:00"),
-            (teams[0], teams[2], "17/06", "22:00"),
-            (teams[1], teams[3], "17/06", "18:00"),
-            (teams[3], teams[0], "22/06", "16:00"),
-            (teams[1], teams[2], "22/06", "20:00")
-        ]
-        # Ajuste de fechas para grupos posteriores para dar realismo al fixture
-        # (Se puede ajustar cada fecha individualmente según el PDF oficial)
-        for t1, t2, fecha, hora in group_matches:
+        # Fechas escalonadas para cubrir todo el fixture del PDF
+        dates = ["11/06", "11/06", "17/06", "17/06", "22/06", "22/06"]
+        if group_name in ["D", "E", "F"]: dates = ["14/06", "15/06", "19/06", "20/06", "24/06", "25/06"]
+        if group_name in ["G", "H", "I"]: dates = ["16/06", "17/06", "21/06", "22/06", "26/06", "27/06"]
+        
+        pairs = [(teams[0], teams[1]), (teams[2], teams[3]), (teams[0], teams[2]), (teams[1], teams[3]), (teams[3], teams[0]), (teams[1], teams[2])]
+        
+        for i, pair in enumerate(pairs):
             matches.append({
                 "id": match_id, "fase": "Grupos", "grupo": group_name,
-                "e1": t1, "e2": t2, "fecha": fecha, "hora": hora
+                "e1": pair[0], "e2": pair[1], "fecha": dates[i], "hora": "18:00"
             })
             match_id += 1
             
-    # Estructura de Eliminatorias
-    eliminatorias = [
-        {"id": 101, "fase": "Octavos", "grupo": "Elim.", "e1": "1º Grupo A", "e2": "2º Grupo B", "fecha": "28/06", "hora": "15:00"},
-        {"id": 201, "fase": "Cuartos", "grupo": "Elim.", "e1": "Ganador 101", "e2": "Ganador 102", "fecha": "04/07", "hora": "17:00"},
-        {"id": 301, "fase": "Final", "grupo": "Final", "e1": "Finalista 1", "e2": "Finalista 2", "fecha": "19/07", "hora": "19:00"},
-    ]
-    return pd.DataFrame(matches + eliminatorias)
+    # Estructura Eliminatoria (IDs 73 en adelante)
+    for i in range(73, 105): # Espacio para 32 partidos de eliminación
+        matches.append({
+            "id": i, "fase": "Eliminatorias", "grupo": "Finales", 
+            "e1": f"Clasificado {i}", "e2": f"Clasificado {i+1}", "fecha": "Julio", "hora": "20:00"
+        })
+        
+    return pd.DataFrame(matches)
 
 # --- 3. DIÁLOGO COMODÍN ---
 @st.dialog("🃏 COMODÍN DE VENTAS JUNIO")
 def modal_comodin(v_actual):
-    st.markdown("##### ¿Qué porcentaje de cumplimiento alcanzará la empresa este mes?")
+    st.markdown("##### ¿Qué porcentaje de cumplimiento alcanzará Würth Uruguay este mes?")
     val = st.number_input("Tu apuesta (%):", 0.0, 200.0, v_actual, step=0.1)
+    st.write("📌 **Puntos:** 50 pts al exacto | 10 pts al Top 10 más cercano.")
     if st.button("Confirmar Apuesta"):
         st.session_state.comodin_temp = val
         st.rerun()
@@ -85,10 +84,7 @@ st.markdown("""
                     url("https://images.unsplash.com/photo-1574629810360-7efbbe195018?q=80&w=2093");
         background-size: cover; background-attachment: fixed;
     }
-    /* Logo Recto Forzado */
-    [data-testid="stImage"] > img, [data-testid="stImage"] img {
-        border-radius: 0px !important;
-    }
+    [data-testid="stImage"] > img, [data-testid="stImage"] img { border-radius: 0px !important; }
     .logo-box { background-color: white; padding: 10px; display: inline-block; margin-bottom: 20px; border: 1px solid #eee; }
     .grupo-header-card {
         background: linear-gradient(90deg, #ED1C24 0%, #B21217 100%);
@@ -96,9 +92,9 @@ st.markdown("""
         font-weight: bold; font-size: 16px; margin-top: 20px;
         display: flex; align-items: center; justify-content: space-between;
     }
-    .grupo-card {
-        background: white; border: 1px solid #ddd; border-radius: 8px;
-        padding: 15px; margin-bottom: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+    .info-comodin-card {
+        background: white; border-left: 5px solid #ED1C24; padding: 15px; 
+        margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); border-radius: 0 4px 4px 0;
     }
     .status-text { font-size: 12px; color: #28a745; font-weight: bold; }
     </style>
@@ -137,9 +133,15 @@ with menu[0]:
             modal_comodin(0.0)
         
         cur_com = st.session_state.get('comodin_temp', v_com_registrado)
-        st.info(f"🃏 **Comodín Ventas:** {cur_com}%")
+        
+        # TARJETA INFORMATIVA ACTUALIZADA CON PUNTOS
+        st.markdown(f'''
+            <div class="info-comodin-card">
+                <b>🃏 Comodín Ventas Junio:</b> Tu pronóstico actual es del <b>{cur_com}%</b>.<br>
+                <small style="color: #666;">Lógica: 50 pts al exacto | 10 pts al Top 10 más cercano.</small>
+            </div>''', unsafe_allow_html=True)
 
-        f_tabs = st.tabs(["Fase de Grupos", "Octavos", "Cuartos", "Final"])
+        f_tabs = st.tabs(["Fase de Grupos", "Fase Eliminatoria"])
         
         with f_tabs[0]:
             df_g = df_fixture[df_fixture['fase'] == "Grupos"]
@@ -168,7 +170,7 @@ with menu[0]:
                             st.session_state[f"g1_{row['id']}"] = cg1.number_input("L", 0, 20, v1, key=f"in_g1_{row['id']}")
                             st.session_state[f"g2_{row['id']}"] = cg2.number_input("V", 0, 20, v2, key=f"in_g2_{row['id']}")
 
-                        if st.form_submit_button(f"💾 Guardar Pronósticos de {dia}"):
+                        if st.form_submit_button(f"💾 Guardar Pronósticos del {dia}"):
                             db_conn = sqlite3.connect('penca.db')
                             c = db_conn.cursor()
                             ids_str = ",".join(map(str, ids_dia))
@@ -178,29 +180,16 @@ with menu[0]:
                                 g2 = st.session_state.get(f"in_g2_{pid}", 0)
                                 c.execute("INSERT INTO apuestas VALUES (?,?,?,?,?,?,?,?)", 
                                          (u_wn, u_nom, u_ape, u_sec, pid, g1, g2, datetime.now().strftime("%Y-%m-%d %H:%M")))
-                            # Sincronizar comodín
+                            
+                            # Actualizar Comodín
                             c.execute(f"DELETE FROM apuestas WHERE wn='{u_wn}' AND partido_id=999")
                             c.execute("INSERT INTO apuestas VALUES (?,?,?,?,?,?,?,?)", 
                                      (u_wn, u_nom, u_ape, u_sec, 999, cur_com, 0, datetime.now().strftime("%Y-%m-%d %H:%M")))
+                            
                             db_conn.commit()
                             db_conn.close()
-                            st.success(f"¡Pronósticos de {dia} guardados!")
+                            st.success(f"¡Día {dia} guardado con éxito!")
                             st.rerun()
-    else:
-        st.warning("⚠️ Completa tu registro para ver los partidos.")
-
-# --- TAB 2: TABLAS ---
-with menu[1]:
-    st.subheader("📊 Composición de Grupos")
-    df_fix_all = cargar_fixture()
-    grupos_lista = sorted(df_fix_all[df_fix_all['fase']=='Grupos']['grupo'].unique())
-    cols = st.columns(3)
-    for idx, g_name in enumerate(grupos_lista):
-        with cols[idx % 3]:
-            st.markdown(f'<div class="grupo-card"><div style="background:#ED1C24;color:white;padding:5px;border-radius:4px;font-weight:bold;margin-bottom:10px;">GRUPO {g_name}</div>', unsafe_allow_html=True)
-            equipos = pd.concat([df_fix_all[df_fix_all['grupo']==g_name]['e1'], df_fix_all[df_fix_all['grupo']==g_name]['e2']]).unique()
-            for eq in equipos: st.write(f"• {eq}")
-            st.markdown('</div>', unsafe_allow_html=True)
 
 # --- TAB 4: ADMIN ---
 with menu[3]:
@@ -224,5 +213,5 @@ with menu[3]:
         db_conn.close()
         if not df_admin.empty:
             csv = df_admin.to_csv(index=False).encode('utf-8')
-            st.download_button("📥 Descargar Base de Datos (CSV)", csv, "penca_wurth.csv", "text/csv")
+            st.download_button("📥 Descargar Resultados (CSV)", csv, "penca_wurth.csv", "text/csv")
             st.dataframe(df_admin)
