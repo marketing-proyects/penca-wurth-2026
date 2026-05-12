@@ -7,7 +7,7 @@ import os
 # --- 1. CONFIGURACIÓN ---
 st.set_page_config(page_title="Penca Würth 2026", page_icon="⚽", layout="wide")
 
-# URL RAW DE GITHUB PARA RESULTADOS (Para la fase final de Ranking)
+# URL RAW DE GITHUB (Para futura conexión con el Excel de resultados reales)
 URL_RESULTADOS_REALES = "https://raw.githubusercontent.com/tu_usuario/tu_repo/main/resultados.xlsx"
 
 def init_db():
@@ -21,7 +21,7 @@ def init_db():
 
 init_db()
 
-# --- 2. FIXTURE INTEGRAL (72 Partidos de Grupos A al L - Sin Emojis) ---
+# --- 2. FIXTURE INTEGRAL (72 Partidos de Grupos A al L - Nombres Limpios) ---
 def cargar_fixture():
     groups_data = {
         "A": ["México", "Sudáfrica", "Corea del Sur", "Rep. Checa"],
@@ -29,7 +29,7 @@ def cargar_fixture():
         "C": ["Brasil", "Haití", "Marruecos", "Escocia"],
         "D": ["EE. UU.", "Turquía", "Australia", "Paraguay"],
         "E": ["Alemania", "Curazao", "C. Marfil", "Ecuador"],
-        "F": ["P. Bajos", "Japón", "Suecia", "Tunéz"],
+        "F": ["P. Bajos", "Japón", "Suecia", "Túnez"],
         "G": ["Bélgica", "Egipto", "Irán", "N. Zelanda"],
         "H": ["España", "Cabo Verde", "Arabia Saudita", "Uruguay"],
         "I": ["Francia", "Senegal", "Irak", "Noruega"],
@@ -40,9 +40,8 @@ def cargar_fixture():
     
     matches = []
     match_id = 1
-    # Generamos los partidos siguiendo el flujo del calendario (Días 11 al 27 Jun)
     for group_name, teams in groups_data.items():
-        # Fechas escalonadas para cubrir todo el fixture del PDF
+        # Fechas escalonadas para cubrir el mundial
         dates = ["11/06", "11/06", "17/06", "17/06", "22/06", "22/06"]
         if group_name in ["D", "E", "F"]: dates = ["14/06", "15/06", "19/06", "20/06", "24/06", "25/06"]
         if group_name in ["G", "H", "I"]: dates = ["16/06", "17/06", "21/06", "22/06", "26/06", "27/06"]
@@ -57,7 +56,7 @@ def cargar_fixture():
             match_id += 1
             
     # Estructura Eliminatoria (IDs 73 en adelante)
-    for i in range(73, 105): # Espacio para 32 partidos de eliminación
+    for i in range(73, 105):
         matches.append({
             "id": i, "fase": "Eliminatorias", "grupo": "Finales", 
             "e1": f"Clasificado {i}", "e2": f"Clasificado {i+1}", "fecha": "Julio", "hora": "20:00"
@@ -70,7 +69,9 @@ def cargar_fixture():
 def modal_comodin(v_actual):
     st.markdown("##### ¿Qué porcentaje de cumplimiento alcanzará Würth Uruguay este mes?")
     val = st.number_input("Tu apuesta (%):", 0.0, 200.0, v_actual, step=0.1)
-    st.write("📌 **Puntos:** 50 pts al exacto | 10 pts al Top 10 más cercano.")
+    st.write("📌 **Lógica de Puntos:**")
+    st.write("- 50 pts: Acierto exacto del cumplimiento.")
+    st.write("- 10 pts: Estar dentro del Top 10 de colaboradores más cercanos.")
     if st.button("Confirmar Apuesta"):
         st.session_state.comodin_temp = val
         st.rerun()
@@ -84,8 +85,11 @@ st.markdown("""
                     url("https://images.unsplash.com/photo-1574629810360-7efbbe195018?q=80&w=2093");
         background-size: cover; background-attachment: fixed;
     }
+    /* Logo Recto Forzado */
     [data-testid="stImage"] > img, [data-testid="stImage"] img { border-radius: 0px !important; }
+    
     .logo-box { background-color: white; padding: 10px; display: inline-block; margin-bottom: 20px; border: 1px solid #eee; }
+    
     .grupo-header-card {
         background: linear-gradient(90deg, #ED1C24 0%, #B21217 100%);
         color: white; padding: 12px; border-radius: 8px 8px 0px 0px;
@@ -116,14 +120,21 @@ with menu[0]:
     u_nom = c1.text_input("Nombre:").strip()
     u_ape = c2.text_input("Apellido:").strip()
     u_wn = c3.text_input("Código WN:").strip().upper()
-    u_sec = c4.selectbox("Sector:", ["Ventas", "Marketing", "Logística", "IT", "Administración", "RRHH", "Otros"], index=None, placeholder="Selecciona tu sector...")
+    
+    # LISTADO DE SECTORES ACTUALIZADO
+    sectores_wurth = [
+        "Finanzas", "Compras", "Créditos", "RRHH", "IT", "Dirección", 
+        "Logistica", "Televentas", "Tiendas", "e-Commerce", 
+        "Ventas", "Marketing", "Sales Operation", "Otro"
+    ]
+    u_sec = c4.selectbox("Sector:", sectores_wurth, index=None, placeholder="Selecciona tu sector...")
 
     if all([u_nom, u_ape, u_wn, u_sec]):
         db_conn = sqlite3.connect('penca.db')
         df_u = pd.read_sql(f"SELECT * FROM apuestas WHERE wn='{u_wn}'", db_conn)
         db_conn.close()
 
-        # Comodín
+        # Lógica de Pop-up Comodín
         v_com_registrado = 0.0
         if not df_u.empty:
             p_com = df_u[df_u['partido_id'] == 999]
@@ -134,10 +145,9 @@ with menu[0]:
         
         cur_com = st.session_state.get('comodin_temp', v_com_registrado)
         
-        # TARJETA INFORMATIVA ACTUALIZADA CON PUNTOS
         st.markdown(f'''
             <div class="info-comodin-card">
-                <b>🃏 Comodín Ventas Junio:</b> Tu pronóstico actual es del <b>{cur_com}%</b>.<br>
+                <b>🃏 Comodín Ventas Junio:</b> Tu pronóstico es del <b>{cur_com}%</b>.<br>
                 <small style="color: #666;">Lógica: 50 pts al exacto | 10 pts al Top 10 más cercano.</small>
             </div>''', unsafe_allow_html=True)
 
@@ -181,14 +191,13 @@ with menu[0]:
                                 c.execute("INSERT INTO apuestas VALUES (?,?,?,?,?,?,?,?)", 
                                          (u_wn, u_nom, u_ape, u_sec, pid, g1, g2, datetime.now().strftime("%Y-%m-%d %H:%M")))
                             
-                            # Actualizar Comodín
                             c.execute(f"DELETE FROM apuestas WHERE wn='{u_wn}' AND partido_id=999")
                             c.execute("INSERT INTO apuestas VALUES (?,?,?,?,?,?,?,?)", 
                                      (u_wn, u_nom, u_ape, u_sec, 999, cur_com, 0, datetime.now().strftime("%Y-%m-%d %H:%M")))
                             
                             db_conn.commit()
                             db_conn.close()
-                            st.success(f"¡Día {dia} guardado con éxito!")
+                            st.success(f"¡Día {dia} guardado correctamente!")
                             st.rerun()
 
 # --- TAB 4: ADMIN ---
@@ -213,5 +222,5 @@ with menu[3]:
         db_conn.close()
         if not df_admin.empty:
             csv = df_admin.to_csv(index=False).encode('utf-8')
-            st.download_button("📥 Descargar Resultados (CSV)", csv, "penca_wurth.csv", "text/csv")
+            st.download_button("📥 Descargar Resultados (CSV)", csv, "penca_export.csv", "text/csv")
             st.dataframe(df_admin)
