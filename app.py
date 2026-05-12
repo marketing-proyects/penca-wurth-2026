@@ -8,21 +8,17 @@ import os
 st.set_page_config(page_title="Penca Würth 2026", page_icon="⚽", layout="wide")
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# --- 2. FIXTURE REAL (Datos Estáticos del Programa) ---
+# --- 2. FIXTURE (Resumen para la prueba) ---
 def cargar_fixture():
-    # He incluido los partidos según tu estructura de Drive para total coherencia
     data = [
         {"id": 1, "grupo": "A", "e1": "México 🇲🇽", "e2": "Sudáfrica 🇿🇦", "fecha": "11/06", "hora": "18:00"},
         {"id": 2, "grupo": "A", "e1": "Corea del Sur 🇰🇷", "e2": "Rep. Checa 🇨🇿", "fecha": "11/06", "hora": "22:00"},
-        {"id": 3, "grupo": "B", "e1": "Canadá 🇨🇦", "e2": "Bosnia 🇧🇦", "fecha": "12/06", "hora": "16:00"},
-        {"id": 4, "grupo": "B", "e1": "Qatar 🇶🇦", "e2": "Suiza 🇨🇭", "fecha": "12/06", "hora": "20:00"},
-        {"id": 5, "grupo": "C", "e1": "Brasil 🇧🇷", "e2": "Haití 🇭🇹", "fecha": "13/06", "hora": "14:00"},
-        {"id": 6, "grupo": "C", "e1": "Marruecos 🇲🇦", "e2": "Escocia 🏴󠁧󠁢󠁳󠁣󠁴󠁿", "fecha": "13/06", "hora": "19:00"},
-        {"id": 9, "grupo": "F", "e1": "Uruguay 🇺🇾", "e2": "Arabia Saudita 🇸🇦", "fecha": "15/06", "hora": "15:00"}
+        {"id": 9, "grupo": "F", "e1": "Uruguay 🇺🇾", "e2": "Arabia Saudita 🇸🇦", "fecha": "15/06", "hora": "15:00"},
+        {"id": 30, "grupo": "F", "e1": "Uruguay 🇺🇾", "e2": "España 🇪🇸", "fecha": "20/06", "hora": "21:00"},
     ]
     return pd.DataFrame(data)
 
-# --- 3. ESTILO VISUAL CORPORATIVO ---
+# --- 3. ESTILO VISUAL (Corrección de Logo y Estética) ---
 st.markdown("""
     <style>
     [data-testid="stHeader"] {display: none;}
@@ -31,7 +27,14 @@ st.markdown("""
                     url("https://images.unsplash.com/photo-1574629810360-7efbbe195018?q=80&w=2093");
         background-size: cover; background-attachment: fixed;
     }
-    .logo-box { background-color: white; padding: 5px; border: 1px solid #f0f0f0; display: inline-block; margin-bottom: 20px; }
+    
+    /* CORRECCIÓN LOGO: Forzar cuadrado */
+    [data-testid="stImage"] img {
+        border-radius: 0px !important;
+        box-shadow: none !important;
+    }
+    
+    .logo-box { background-color: white; padding: 10px; display: inline-block; margin-bottom: 20px; }
     h1, h2, h3 { color: #ED1C24 !important; font-family: 'Arial Black', sans-serif; text-transform: uppercase; }
     
     .grupo-header-card {
@@ -45,6 +48,7 @@ st.markdown("""
 
 # --- 4. RENDER CABECERA ---
 st.markdown('<div class="logo-box">', unsafe_allow_html=True)
+# Se aplica el logo asegurando que no tenga bordes redondeados
 st.image("logo_wurth.jpg" if os.path.exists("logo_wurth.jpg") else "https://upload.wikimedia.org/wikipedia/commons/1/1e/Wuerth_Logo_2024.svg", width=180)
 st.markdown('</div>', unsafe_allow_html=True)
 
@@ -57,16 +61,17 @@ with menu[0]:
         df_fixture = cargar_fixture()
         
         st.subheader("👤 Registro de Colaborador")
-        c1, c2, c3 = st.columns([1,1,2])
-        u_nom = c1.text_input("Nombre:").strip()
-        u_ape = c2.text_input("Apellido:").strip()
-        # Lista de sectores actualizada según tu requerimiento
-        u_sec = c3.selectbox("Sector:", ["RRHH", "Finanzas", "Créditos", "Compras", "IT", "Marketing", "Dirección", "CEO", "Logística", "Tiendas", "Telentas", "e-Commerce", "Ventas", "Otra"])
+        col_reg1, col_reg2, col_reg3 = st.columns([1,1,1])
+        u_nom = col_reg1.text_input("Nombre:").strip()
+        u_ape = col_reg2.text_input("Apellido:").strip()
+        u_wn = col_reg3.text_input("Código WN (Alfanumérico):").strip().upper() # Nuevo campo WN
+        
+        c_sec = st.selectbox("Sector:", ["RRHH", "Finanzas", "Créditos", "Compras", "IT", "Marketing", "Dirección", "CEO", "Logística", "Tiendas", "Telentas", "e-Commerce", "Ventas", "Otra"])
 
-        if u_nom and u_ape:
+        if u_nom and u_ape and u_wn:
             try:
                 df_apuestas = conn.read(worksheet="apuestas", ttl=0)
-                df_u = df_apuestas[(df_apuestas['nombre'].str.lower() == u_nom.lower()) & (df_apuestas['apellido'].str.lower() == u_ape.lower())]
+                df_u = df_apuestas[(df_apuestas['wn'] == u_wn)] # Buscamos ahora por el código único WN
             except:
                 df_apuestas, df_u = pd.DataFrame(), pd.DataFrame()
 
@@ -74,7 +79,7 @@ with menu[0]:
             dias = sorted(df_fixture['fecha'].unique(), key=lambda x: datetime.strptime(x, "%d/%m"))
             tabs_dias = st.tabs([f"📅 {d}" for d in dias])
 
-            with st.form("penca_form_final"):
+            with st.form("penca_form_wn"):
                 for i, dia in enumerate(dias):
                     with tabs_dias[i]:
                         partidos_dia = df_fixture[df_fixture['fecha'] == dia]
@@ -98,49 +103,22 @@ with menu[0]:
                 st.divider()
                 st.markdown("### 🃏 COMODÍN DE VENTAS JUNIO")
                 u_com = st.number_input("Cumplimiento estimado (%)", 0.0, 200.0, 100.0, step=0.1, key="comodin_val")
-                st.info("Reglas: 50 pts al acierto exacto | 10 pts al Top 10 más cercano.")
 
                 if st.form_submit_button("💾 GUARDAR PRONÓSTICOS"):
-                    # Preparación de datos para subir al Drive
-                    # ... (Lógica de concatenación idéntica a la anterior)
-                    st.success("¡Pronósticos guardados!")
-
-# --- TAB 2: TABLAS (Compatibilidad con tus columnas de Drive) ---
-with menu[1]:
-    st.subheader("📊 Posiciones Reales")
-    try:
-        # Lee tu pestaña 'partidos' con todas tus columnas
-        df_real = conn.read(worksheet="partidos", ttl=0)
-        fixture = cargar_fixture()
-        
-        if not df_real.empty:
-            # Cruzamos los datos reales con el fixture estático por ID
-            df_m = fixture.merge(df_real[['id', 'score_1_real', 'score_2_real']], on='id')
-            
-            for grupo in sorted(fixture['grupo'].unique()):
-                st.markdown(f"#### GRUPO {grupo}")
-                res_grupo = df_m[df_m['grupo'] == grupo]
-                stats = {}
-                
-                for _, r in res_grupo.iterrows():
-                    # Solo procesamos si ya cargaste un resultado real en el Drive
-                    if pd.notnull(r['score_1_real']) and pd.notnull(r['score_2_real']):
-                        for eq, gl, cnt in [(r['e1'], r['score_1_real'], r['score_2_real']), (r['e2'], r['score_2_real'], r['score_1_real'])]:
-                            if eq not in stats: stats[eq] = {'PJ': 0, 'Pts': 0, 'DG': 0}
-                            stats[eq]['PJ'] += 1
-                            stats[eq]['DG'] += (gl - cnt)
-                            if gl > cnt: stats[eq]['Pts'] += 3
-                            elif gl == cnt: stats[eq]['Pts'] += 1
-                
-                if stats:
-                    df_stats = pd.DataFrame.from_dict(stats, orient='index').reset_index().rename(columns={'index': 'Equipo'})
-                    st.table(df_stats.sort_values(by=['Pts', 'DG'], ascending=False))
-                else:
-                    st.caption("Esperando resultados oficiales para este grupo.")
-    except Exception as e:
-        st.info("Carga resultados reales en la pestaña 'partidos' para ver las tablas.")
-
-# --- TAB 3: RANKING ---
-with menu[2]:
-    st.subheader("🥇 Ranking Oficial")
-    st.write("Cargando puntajes (Fútbol + Comodín)...")
+                    nuevas = []
+                    for _, row in df_fixture.iterrows():
+                        nuevas.append({
+                            "nombre": u_nom, "apellido": u_ape, "wn": u_wn, "sector": c_sec, 
+                            "partido_id": row['id'], 
+                            "goles_equipo_1": st.session_state[f"e1_{row['id']}"], 
+                            "goles_equipo_2": st.session_state[f"e2_{row['id']}"],
+                            "fecha_registro": datetime.now().strftime("%Y-%m-%d %H:%M")
+                        })
+                    # Guardado del comodín
+                    nuevas.append({"nombre": u_nom, "apellido": u_ape, "wn": u_wn, "sector": c_sec, "partido_id": 999, "goles_equipo_1": u_com, "goles_equipo_2": 0, "fecha_registro": datetime.now().strftime("%Y-%m-%d %H:%M")})
+                    
+                    # Limpiamos registros previos del mismo WN para no duplicar
+                    df_limpio = df_apuestas[df_apuestas['wn'] != u_wn] if not df_apuestas.empty else pd.DataFrame()
+                    df_final = pd.concat([df_limpio, pd.DataFrame(nuevas)], ignore_index=True)
+                    conn.update(worksheet="apuestas", data=df_final)
+                    st.success(f"¡Pronósticos guardados para el colaborador {u_wn}!")
