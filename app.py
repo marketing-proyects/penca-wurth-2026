@@ -14,7 +14,7 @@ st.set_page_config(
 # Conexión a Google Sheets
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# --- 2. CSS: ESTILO CEREBRO / GRADIENTE DIRECCIONAL ---
+# --- 2. CSS: ESTILO CEREBRO CON GRADIENTE ---
 st.markdown("""
     <style>
     #MainMenu {visibility: hidden;}
@@ -35,6 +35,7 @@ st.markdown("""
         background-attachment: fixed;
     }
 
+    /* Blindaje de Logo Técnica CEREBRO */
     [data-testid="stImage"] img { border-radius: 0px !important; }
     .logo-box-cerebro {
         background-color: white !important;
@@ -55,15 +56,15 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. FUNCIONES DE DATOS (CON LIMPIEZA) ---
+# --- 3. FUNCIONES DE DATOS ---
 def obtener_datos(pestana):
     try:
-        # ttl=0 para forzar lectura fresca
+        # Forzamos ttl=0 para ignorar el caché que causa el error de la imagen
         df = conn.read(worksheet=pestana, ttl=0)
-        # Limpieza: eliminar columnas o filas vacías que ensucian la lectura
-        df = df.dropna(how='all', axis=0).dropna(how='all', axis=1)
+        # Limpiamos espacios en blanco en los nombres de las columnas
+        df.columns = [str(c).strip().lower() for c in df.columns]
         return df
-    except Exception:
+    except Exception as e:
         return pd.DataFrame()
 
 # --- 4. RENDERIZADO CABECERA ---
@@ -71,21 +72,22 @@ st.markdown('<div class="logo-box-cerebro">', unsafe_allow_html=True)
 if os.path.exists("logo_wurth.jpg"):
     st.image("logo_wurth.jpg", width=220)
 else:
-    st.write("### WÜRTH")
+    st.image("https://upload.wikimedia.org/wikipedia/commons/1/1e/Wuerth_Logo_2024.svg", width=220)
 st.markdown('</div>', unsafe_allow_html=True)
 
 st.markdown("<h1 class='main-title'>PENCA DIGITAL WÜRTH 2026</h1>", unsafe_allow_html=True)
 
-# --- 5. TABS ---
+# --- 5. NAVEGACIÓN ---
 tab1, tab2, tab3 = st.tabs(["⚽ PRONÓSTICOS", "📊 DESAFÍO VENTAS", "🥇 RANKING"])
 
 with tab1:
     st.markdown("<br>", unsafe_allow_html=True)
     df_partidos = obtener_datos("partidos")
 
-    # Verificamos si el DataFrame tiene datos y las columnas necesarias
-    columnas_req = ['id', 'local', 'visitante']
-    if not df_partidos.empty and all(col in df_partidos.columns for col in columnas_req):
+    # Verificamos columnas necesarias (ahora en minúsculas por la limpieza del punto 3)
+    cols_necesarias = ['id', 'local', 'visitante']
+    
+    if not df_partidos.empty and all(c in df_partidos.columns for c in cols_necesarias):
         with st.form("form_penca"):
             usuario = st.text_input("Participante:", placeholder="Ingresa tu nombre")
             st.divider()
@@ -95,10 +97,7 @@ with tab1:
                 col1, col2 = st.columns([3, 2])
                 with col1:
                     st.markdown(f"**{row['local']} vs {row['visitante']}**")
-                    # Manejo de columnas opcionales para evitar errores
-                    fecha = row.get('fecha', 'TBD')
-                    hora = row.get('hora_uy', '--:--')
-                    st.caption(f"{fecha} | {hora} hs")
+                    st.caption(f"{row.get('fecha', '-')} | {row.get('hora_uy', '-')} hs")
                 
                 with col2:
                     c1, c2 = st.columns(2)
@@ -108,9 +107,9 @@ with tab1:
                 respuestas.append({
                     "usuario": usuario,
                     "partido_id": row['id'],
-                    "g_local": g_l,
-                    "g_visitante": g_v,
-                    "fecha_envio": datetime.now().strftime("%Y-%m-%d %H:%M")
+                    "goles_local": g_l,
+                    "goles_visitante": g_v,
+                    "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M")
                 })
                 st.markdown("---")
             
@@ -118,29 +117,24 @@ with tab1:
                 if usuario:
                     try:
                         df_nuevas = pd.DataFrame(respuestas)
-                        # Intentar leer apuestas previas para no sobreescribir todo el archivo
-                        try:
-                            df_viejas = obtener_datos("apuestas")
-                            df_final = pd.concat([df_viejas, df_nuevas], ignore_index=True)
-                        except:
-                            df_final = df_nuevas
-                            
+                        df_actual = obtener_datos("apuestas")
+                        df_final = pd.concat([df_actual, df_nuevas], ignore_index=True)
                         conn.update(worksheet="apuestas", data=df_final)
-                        st.success(f"✅ ¡Pronósticos guardados, {usuario}!")
-                    except Exception as e:
-                        st.error(f"Error al guardar: {e}")
+                        st.success(f"✅ ¡Todo guardado, {usuario}!")
+                    except:
+                        st.error("Error al guardar. Asegúrate de tener la pestaña 'apuestas'.")
                 else:
                     st.error("⚠️ El nombre es obligatorio.")
     else:
-        # Si el DataFrame llega vacío o con columnas mal nombradas
-        st.warning("⚠️ No se detectan datos válidos.")
-        st.write("Columnas detectadas en el Excel:", list(df_partidos.columns))
-        st.info("Asegúrate de que la primera fila del Excel tenga exactamente: id, fecha, hora_uy, local, visitante.")
+        st.warning("⚠️ No se detectan datos en la pestaña 'partidos'.")
+        if not df_partidos.empty:
+            st.write("Columnas encontradas:", list(df_partidos.columns))
+            st.info("Revisa que la fila 1 del Excel tenga: id, fecha, hora_uy, local, visitante.")
 
 with tab2:
-    st.header("🎯 Desafío Ventas")
-    st.info("Módulo en desarrollo.")
+    st.header("📊 Desafío Ventas")
+    st.info("Módulo de cumplimiento.")
 
 with tab3:
     st.header("🥇 Ranking")
-    st.info("Se habilitará al comenzar el torneo.")
+    st.info("Ranking oficial de la Penca.")
