@@ -8,7 +8,7 @@ import os
 st.set_page_config(page_title="Penca Würth 2026", page_icon="⚽", layout="wide")
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# --- 2. FIXTURE (Resumen para la prueba) ---
+# --- 2. FIXTURE REAL (Muestra para Prueba) ---
 def cargar_fixture():
     data = [
         {"id": 1, "grupo": "A", "e1": "México 🇲🇽", "e2": "Sudáfrica 🇿🇦", "fecha": "11/06", "hora": "18:00"},
@@ -18,7 +18,7 @@ def cargar_fixture():
     ]
     return pd.DataFrame(data)
 
-# --- 3. ESTILO VISUAL (Corrección de Logo y Estética) ---
+# --- 3. ESTILO VISUAL (Logo Blindado y Colores Würth) ---
 st.markdown("""
     <style>
     [data-testid="stHeader"] {display: none;}
@@ -27,20 +27,14 @@ st.markdown("""
                     url("https://images.unsplash.com/photo-1574629810360-7efbbe195018?q=80&w=2093");
         background-size: cover; background-attachment: fixed;
     }
-    
-    /* CORRECCIÓN LOGO: Forzar cuadrado */
-    [data-testid="stImage"] img {
-        border-radius: 0px !important;
-        box-shadow: none !important;
-    }
-    
-    .logo-box { background-color: white; padding: 10px; display: inline-block; margin-bottom: 20px; }
-    h1, h2, h3 { color: #ED1C24 !important; font-family: 'Arial Black', sans-serif; text-transform: uppercase; }
-    
+    /* Logo Blindado: Forzar esquinas rectas */
+    [data-testid="stImage"] img { border-radius: 0px !important; }
+    .logo-box { background-color: white; padding: 10px; border: 1px solid #f0f0f0; display: inline-block; margin-bottom: 20px; }
+    h1, h2 { color: #ED1C24 !important; font-family: 'Arial Black', sans-serif; text-transform: uppercase; }
     .grupo-header-card {
         background: linear-gradient(90deg, #ED1C24 0%, #B21217 100%);
-        color: white; padding: 15px; border-radius: 8px 8px 0px 0px;
-        font-weight: bold; font-size: 20px; margin-top: 30px;
+        color: white; padding: 12px; border-radius: 8px 8px 0px 0px;
+        font-weight: bold; font-size: 20px; margin-top: 25px;
         display: flex; align-items: center; justify-content: space-between;
     }
     </style>
@@ -48,7 +42,6 @@ st.markdown("""
 
 # --- 4. RENDER CABECERA ---
 st.markdown('<div class="logo-box">', unsafe_allow_html=True)
-# Se aplica el logo asegurando que no tenga bordes redondeados
 st.image("logo_wurth.jpg" if os.path.exists("logo_wurth.jpg") else "https://upload.wikimedia.org/wikipedia/commons/1/1e/Wuerth_Logo_2024.svg", width=180)
 st.markdown('</div>', unsafe_allow_html=True)
 
@@ -60,18 +53,21 @@ with menu[0]:
     with fases[0]:
         df_fixture = cargar_fixture()
         
-        st.subheader("👤 Registro de Colaborador")
-        col_reg1, col_reg2, col_reg3 = st.columns([1,1,1])
-        u_nom = col_reg1.text_input("Nombre:").strip()
-        u_ape = col_reg2.text_input("Apellido:").strip()
-        u_wn = col_reg3.text_input("Código WN (Alfanumérico):").strip().upper() # Nuevo campo WN
+        st.subheader("👤 Registro del Colaborador")
+        c1, c2, c3 = st.columns([1,1,1])
+        u_nom = c1.text_input("Nombre:").strip()
+        u_ape = c2.text_input("Apellido:").strip()
+        u_wn = c3.text_input("Código WN:").strip().upper() # Tu código de verificación
         
-        c_sec = st.selectbox("Sector:", ["RRHH", "Finanzas", "Créditos", "Compras", "IT", "Marketing", "Dirección", "CEO", "Logística", "Tiendas", "Telentas", "e-Commerce", "Ventas", "Otra"])
+        u_sec = st.selectbox("Sector:", ["RRHH", "Finanzas", "Créditos", "Compras", "IT", "Marketing", "Dirección", "CEO", "Logística", "Tiendas", "Telentas", "e-Commerce", "Ventas", "Otra"])
 
         if u_nom and u_ape and u_wn:
+            # Intentar leer apuestas previas
             try:
                 df_apuestas = conn.read(worksheet="apuestas", ttl=0)
-                df_u = df_apuestas[(df_apuestas['wn'] == u_wn)] # Buscamos ahora por el código único WN
+                # Convertimos a string por seguridad en la comparación
+                df_apuestas['wn'] = df_apuestas['wn'].astype(str)
+                df_u = df_apuestas[df_apuestas['wn'] == u_wn]
             except:
                 df_apuestas, df_u = pd.DataFrame(), pd.DataFrame()
 
@@ -79,7 +75,7 @@ with menu[0]:
             dias = sorted(df_fixture['fecha'].unique(), key=lambda x: datetime.strptime(x, "%d/%m"))
             tabs_dias = st.tabs([f"📅 {d}" for d in dias])
 
-            with st.form("penca_form_wn"):
+            with st.form("penca_final_v1"):
                 for i, dia in enumerate(dias):
                     with tabs_dias[i]:
                         partidos_dia = df_fixture[df_fixture['fecha'] == dia]
@@ -105,20 +101,31 @@ with menu[0]:
                 u_com = st.number_input("Cumplimiento estimado (%)", 0.0, 200.0, 100.0, step=0.1, key="comodin_val")
 
                 if st.form_submit_button("💾 GUARDAR PRONÓSTICOS"):
-                    nuevas = []
+                    nuevas_filas = []
                     for _, row in df_fixture.iterrows():
-                        nuevas.append({
-                            "nombre": u_nom, "apellido": u_ape, "wn": u_wn, "sector": c_sec, 
+                        nuevas_filas.append({
+                            "nombre": u_nom, "apellido": u_ape, "wn": u_wn, "sector": u_sec,
                             "partido_id": row['id'], 
-                            "goles_equipo_1": st.session_state[f"e1_{row['id']}"], 
+                            "goles_equipo_1": st.session_state[f"e1_{row['id']}"],
                             "goles_equipo_2": st.session_state[f"e2_{row['id']}"],
                             "fecha_registro": datetime.now().strftime("%Y-%m-%d %H:%M")
                         })
-                    # Guardado del comodín
-                    nuevas.append({"nombre": u_nom, "apellido": u_ape, "wn": u_wn, "sector": c_sec, "partido_id": 999, "goles_equipo_1": u_com, "goles_equipo_2": 0, "fecha_registro": datetime.now().strftime("%Y-%m-%d %H:%M")})
+                    # Comodín (ID 999)
+                    nuevas_filas.append({"nombre": u_nom, "apellido": u_ape, "wn": u_wn, "sector": u_sec, "partido_id": 999, "goles_equipo_1": u_com, "goles_equipo_2": 0, "fecha_registro": datetime.now().strftime("%Y-%m-%d %H:%M")})
                     
-                    # Limpiamos registros previos del mismo WN para no duplicar
-                    df_limpio = df_apuestas[df_apuestas['wn'] != u_wn] if not df_apuestas.empty else pd.DataFrame()
-                    df_final = pd.concat([df_limpio, pd.DataFrame(nuevas)], ignore_index=True)
-                    conn.update(worksheet="apuestas", data=df_final)
-                    st.success(f"¡Pronósticos guardados para el colaborador {u_wn}!")
+                    df_nuevas = pd.DataFrame(nuevas_filas)
+                    
+                    # LÓGICA DE ACTUALIZACIÓN SEGURA
+                    if not df_apuestas.empty:
+                        df_limpio = df_apuestas[df_apuestas['wn'] != u_wn]
+                        df_final = pd.concat([df_limpio, df_nuevas], ignore_index=True)
+                    else:
+                        df_final = df_nuevas
+                    
+                    # Sobreescribir la hoja completa para evitar el UnsupportedOperationError
+                    try:
+                        conn.update(data=df_final, worksheet="apuestas")
+                        st.success(f"¡Éxito! Pronósticos guardados para el código WN: {u_wn}")
+                        st.balloons()
+                    except Exception as e:
+                        st.error("Error al conectar con Drive. Verifica los permisos de edición.")
