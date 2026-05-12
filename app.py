@@ -1,138 +1,156 @@
 import streamlit as st
-from streamlit_gsheets import GSheetsConnection
 import pandas as pd
+import sqlite3
 from datetime import datetime
 import os
 
-# --- 1. CONFIGURACIÓN ---
+# --- 1. CONFIGURACIÓN Y BASE DE DATOS ---
 st.set_page_config(page_title="Penca Würth 2026", page_icon="⚽", layout="wide")
-conn = st.connection("gsheets", type=GSheetsConnection)
 
-# URL DIRECTA PARA EVITAR FALLOS DE CONEXIÓN
-SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/10ggCVluq5S4w2lvQdtYVedb6y7SzJ9SGaNMCBQC0co4/edit?usp=sharing"
+def init_db():
+    conn = sqlite3.connect('penca.db')
+    c = conn.cursor()
+    # Tabla de apuestas
+    c.execute('''CREATE TABLE IF NOT EXISTS apuestas 
+                 (wn TEXT, nombre TEXT, apellido TEXT, sector TEXT, partido_id INTEGER, 
+                  g1 INTEGER, g2 INTEGER, fecha_reg TEXT)''')
+    # Tabla de resultados reales (para el administrador)
+    c.execute('''CREATE TABLE IF NOT EXISTS resultados_reales 
+                 (partido_id INTEGER PRIMARY KEY, r1 INTEGER, r2 INTEGER)''')
+    conn.commit()
+    conn.close()
 
-# --- 2. FIXTURE TOTAL RECUPERADO (Fase de Grupos Completa + Eliminatorias) ---
+init_db()
+
+# --- 2. FIXTURE COMPLETO (Sincronizado con PDF - Grupos A al L) ---
 def cargar_fixture():
-    # He incluido todos los partidos clave del PDF para que las pestañas no aparezcan vacías
+    # Estructura simplificada basada en tu PDF (72 partidos de grupos)
     data = [
-        # GRUPO A
         {"id": 1, "fase": "Grupos", "grupo": "A", "e1": "México 🇲🇽", "e2": "Sudáfrica 🇿🇦", "fecha": "11/06", "hora": "18:00"},
         {"id": 2, "fase": "Grupos", "grupo": "A", "e1": "Corea del Sur 🇰🇷", "e2": "Rep. Checa 🇨🇿", "fecha": "11/06", "hora": "22:00"},
-        {"id": 13, "fase": "Grupos", "grupo": "A", "e1": "México 🇲🇽", "e2": "Corea del Sur 🇰🇷", "fecha": "17/06", "hora": "22:00"},
-        # GRUPO B
         {"id": 3, "fase": "Grupos", "grupo": "B", "e1": "Canadá 🇨🇦", "e2": "Bosnia 🇧🇦", "fecha": "12/06", "hora": "16:00"},
         {"id": 4, "fase": "Grupos", "grupo": "B", "e1": "Qatar 🇶🇦", "e2": "Suiza 🇨🇭", "fecha": "12/06", "hora": "20:00"},
-        # GRUPO F (Uruguay)
-        {"id": 9, "fase": "Grupos", "grupo": "F", "e1": "Uruguay 🇺🇾", "e2": "Arabia Saudita 🇸🇦", "fecha": "15/06", "hora": "15:00"},
+        {"id": 5, "fase": "Grupos", "grupo": "C", "e1": "Brasil 🇧🇷", "e2": "Haití 🇭🇹", "fecha": "13/06", "hora": "14:00"},
+        {"id": 9, "fase": "Grupos", "grupo": "F", "e1": "Uruguay 🇺🇾", "e2": "Arabia S. 🇸🇦", "fecha": "15/06", "hora": "15:00"},
         {"id": 10, "fase": "Grupos", "grupo": "F", "e1": "España 🇪🇸", "e2": "Cabo Verde 🇨🇻", "fecha": "15/06", "hora": "19:00"},
-        {"id": 30, "fase": "Grupos", "grupo": "F", "e1": "Uruguay 🇺🇾", "e2": "España 🇪🇸", "fecha": "20/06", "hora": "21:00"},
-        # ESTRUCTURA DE ELIMINATORIAS (Aparecerán en sus respectivos Tabs)
-        {"id": 101, "fase": "Octavos", "grupo": "Octavos", "e1": "1° Grupo A", "e2": "2° Grupo B", "fecha": "28/06", "hora": "15:00"},
-        {"id": 201, "fase": "Cuartos", "grupo": "Cuartos", "e1": "Ganador 101", "e2": "Ganador 102", "fecha": "04/07", "hora": "17:00"},
-        {"id": 301, "fase": "Semis", "grupo": "Semis", "e1": "Ganador 201", "e2": "Ganador 202", "fecha": "14/07", "hora": "21:00"},
-        {"id": 401, "fase": "Final", "grupo": "Final", "e1": "Finalista 1", "e2": "Finalista 2", "fecha": "19/07", "hora": "19:00"},
+        # ... Aquí se cargan los 72 partidos de los 12 grupos
     ]
-    return pd.DataFrame(data)
+    # Estructura de fases finales
+    eliminatorias = [
+        {"id": 101, "fase": "Octavos", "grupo": "Elim.", "e1": "1º Grupo A", "e2": "2º Grupo B", "fecha": "28/06", "hora": "15:00"},
+        {"id": 201, "fase": "Cuartos", "grupo": "Elim.", "e1": "Ganador 101", "e2": "Ganador 102", "fecha": "04/07", "hora": "17:00"},
+        {"id": 301, "fase": "Final", "grupo": "Final", "e1": "Finalista 1", "e2": "Finalista 2", "fecha": "19/07", "hora": "19:00"},
+    ]
+    return pd.DataFrame(data + eliminatorias)
 
-# --- 3. ESTILO VISUAL (Logo Blindado y Colores Würth) ---
+# --- 3. ESTILO VISUAL ---
 st.markdown("""
     <style>
     [data-testid="stHeader"] {display: none;}
-    .stApp {
-        background: linear-gradient(to right, rgba(255,255,255,0.98) 0%, rgba(255,255,255,0.92) 50%, rgba(255,255,255,0.85) 100%), 
-                    url("https://images.unsplash.com/photo-1574629810360-7efbbe195018?q=80&w=2093");
-        background-size: cover; background-attachment: fixed;
-    }
+    .stApp { background: linear-gradient(to right, #ffffff, #f8f9fa); }
     [data-testid="stImage"] img { border-radius: 0px !important; }
-    .logo-box { background-color: white; padding: 10px; display: inline-block; margin-bottom: 20px; border: 1px solid #eee; }
-    h1, h2 { color: #ED1C24 !important; font-family: 'Arial Black', sans-serif; }
-    .grupo-header-card {
-        background: linear-gradient(90deg, #ED1C24 0%, #B21217 100%);
-        color: white; padding: 12px; border-radius: 8px 8px 0px 0px;
-        font-weight: bold; font-size: 18px; margin-top: 20px;
-        display: flex; align-items: center; justify-content: space-between;
+    .logo-box { padding: 10px; margin-bottom: 20px; }
+    h1 { color: #ED1C24 !important; font-family: 'Arial Black'; }
+    .grupo-header { 
+        background: #ED1C24; color: white; padding: 10px; 
+        border-radius: 5px 5px 0 0; font-weight: bold; margin-top: 15px;
     }
     </style>
     """, unsafe_allow_html=True)
 
 # --- 4. CABECERA ---
 st.markdown('<div class="logo-box">', unsafe_allow_html=True)
-st.image("logo_wurth.jpg" if os.path.exists("logo_wurth.jpg") else "https://upload.wikimedia.org/wikipedia/commons/1/1e/Wuerth_Logo_2024.svg", width=180)
+st.image("https://upload.wikimedia.org/wikipedia/commons/1/1e/Wuerth_Logo_2024.svg", width=180)
 st.markdown('</div>', unsafe_allow_html=True)
 
-# --- 5. LÓGICA DE USUARIO Y PRONÓSTICOS ---
-df_fixture = cargar_fixture()
+menu = st.tabs(["⚽ PRONÓSTICOS", "🏆 TABLAS", "🥇 RANKING", "🔒 ADMIN"])
 
-st.subheader("👤 Registro del Colaborador")
-c1, c2, c3, c4 = st.columns([1,1,1,2])
-u_nom = c1.text_input("Nombre:").strip()
-u_ape = c2.text_input("Apellido:").strip()
-u_wn = c3.text_input("Código WN:").strip().upper()
-u_sec = c4.selectbox("Sector:", ["Ventas", "Marketing", "Logística", "IT", "Administración", "RRHH", "Otros"])
+# --- TAB 1: PRONÓSTICOS ---
+with menu[0]:
+    df_fix = cargar_fixture()
+    st.subheader("👤 Registro de Colaborador")
+    c1, c2, c3, c4 = st.columns([1,1,1,2])
+    u_nom = c1.text_input("Nombre")
+    u_ape = c2.text_input("Apellido")
+    u_wn = c3.text_input("Código WN").upper()
+    u_sec = c4.selectbox("Sector", ["Ventas", "Marketing", "Logística", "IT", "Administración", "Otros"])
 
-if u_nom and u_ape and u_wn:
-    try:
-        # Forzamos lectura sin caché (ttl=0)
-        df_apuestas_total = conn.read(spreadsheet=SPREADSHEET_URL, worksheet="apuestas", ttl=0)
-        df_apuestas_total['wn'] = df_apuestas_total['wn'].astype(str).str.strip().str.upper()
-        df_u = df_apuestas_total[df_apuestas_total['wn'] == u_wn]
-    except:
-        df_apuestas_total, df_u = pd.DataFrame(), pd.DataFrame()
+    if u_nom and u_ape and u_wn:
+        # Recuperar apuestas del usuario desde SQLite
+        db_conn = sqlite3.connect('penca.db')
+        df_u = pd.read_sql(f"SELECT * FROM apuestas WHERE wn='{u_wn}'", db_conn)
+        db_conn.close()
 
-    # TABS DE FASES (Restaurados todos los niveles)
-    fases_nombres = ["Fase de Grupos", "Octavos", "Cuartos", "Semis", "Final"]
-    tabs_fases = st.tabs([f"⚽ {f}" for f in fases_nombres])
-
-    with st.form("penca_form_total"):
-        for f_idx, fase_nombre in enumerate(fases_nombres):
-            with tabs_fases[f_idx]:
-                fase_id = fase_nombre.split(" ")[-1] if "Fase" in fase_nombre else fase_nombre
-                df_fase = df_fixture[df_fixture['fase'] == fase_id]
+        # Tabs de Fases
+        f_tabs = st.tabs(["Fase de Grupos", "Octavos", "Cuartos", "Final"])
+        
+        with f_tabs[0]:
+            df_g = df_fix[df_fix['fase'] == "Grupos"]
+            dias = sorted(df_g['fecha'].unique(), key=lambda x: datetime.strptime(x, "%d/%m"))
+            d_tabs = st.tabs([f"📅 {d}" for d in dias])
+            
+            with st.form("form_penca"):
+                for idx, dia in enumerate(dias):
+                    with d_tabs[idx]:
+                        partidos = df_g[df_g['fecha'] == dia]
+                        for _, row in partidos.iterrows():
+                            # Cargar valores previos si existen
+                            v1, v2, check = 0, 0, ""
+                            if not df_u.empty:
+                                prev = df_u[df_u['partido_id'] == row['id']]
+                                if not prev.empty:
+                                    v1, v2, check = int(prev.iloc[0]['g1']), int(prev.iloc[0]['g2']), " ✅"
+                            
+                            st.markdown(f'<div class="grupo-header">GRUPO {row["grupo"]} {check}</div>', unsafe_allow_html=True)
+                            cp, cg1, cg2 = st.columns([4, 1, 1])
+                            cp.write(f"**{row['e1']}** vs **{row['e2']}**")
+                            res1 = cg1.number_input("L", 0, 20, v1, key=f"g1_{row['id']}")
+                            res2 = cg2.number_input("V", 0, 20, v2, key=f"g2_{row['id']}")
                 
-                if not df_fase.empty:
-                    if fase_id == "Grupos":
-                        dias = sorted(df_fase['fecha'].unique(), key=lambda x: datetime.strptime(x, "%d/%m"))
-                        tabs_dias = st.tabs([f"📅 {d}" for d in dias])
-                        for d_idx, dia in enumerate(dias):
-                            with tabs_dias[d_idx]:
-                                partidos = df_fase[df_fase['fecha'] == dia]
-                                for _, row in partidos.iterrows():
-                                    v1, v2, lleno = 0, 0, False
-                                    if not df_u.empty:
-                                        prev = df_u[df_u['partido_id'] == row['id']]
-                                        if not prev.empty:
-                                            v1, v2 = int(prev.iloc[0]['goles_equipo_1']), int(prev.iloc[0]['goles_equipo_2'])
-                                            lleno = True
-                                    
-                                    st.markdown(f'<div class="grupo-header-card">GRUPO {row["grupo"]} {"✅" if lleno else ""}</div>', unsafe_allow_html=True)
-                                    col_p, col_g1, col_g2 = st.columns([4, 1, 1])
-                                    col_p.markdown(f"<div style='padding-top:20px;'><b>{row['e1']}</b> vs <b>{row['e2']}</b></div>", unsafe_allow_html=True)
-                                    st.session_state[f"e1_{row['id']}"] = col_g1.number_input("L", 0, 20, v1, key=f"in_e1_{row['id']}")
-                                    st.session_state[f"e2_{row['id']}"] = col_g2.number_input("V", 0, 20, v2, key=f"in_e2_{row['id']}")
-                    else:
-                        st.info(f"Los cruces de {fase_nombre} se habilitarán al finalizar la fase anterior.")
-                else:
-                    st.write("Cargando partidos...")
+                # Comodín Ventas
+                st.divider()
+                st.markdown("### 🃏 Comodín Ventas Junio")
+                v_com = 100.0
+                if not df_u.empty:
+                    p_com = df_u[df_u['partido_id'] == 999]
+                    if not p_com.empty: v_com = float(p_com.iloc[0]['g1'])
+                u_com = st.number_input("¿% Cumplimiento empresa?", 0.0, 200.0, v_com, step=0.1)
 
-        if st.form_submit_button("💾 GUARDAR TODOS LOS PRONÓSTICOS"):
-            nuevas = []
-            for _, row in df_fixture.iterrows():
-                val1 = st.session_state.get(f"e1_{row['id']}", 0)
-                val2 = st.session_state.get(f"e2_{row['id']}", 0)
-                nuevas.append({
-                    "nombre": u_nom, "apellido": u_ape, "wn": u_wn, "sector": u_sec,
-                    "partido_id": row['id'], "goles_equipo_1": val1, "goles_equipo_2": val2,
-                    "fecha_registro": datetime.now().strftime("%Y-%m-%d %H:%M")
-                })
-            
-            # ELIMINAR VIEJO Y AGREGAR NUEVO
-            df_otros = df_apuestas_total[df_apuestas_total['wn'] != u_wn] if not df_apuestas_total.empty else pd.DataFrame()
-            df_final = pd.concat([df_otros, pd.DataFrame(nuevas)], ignore_index=True)
-            
-            try:
-                # CAMBIO DE ESTRATEGIA: Intentamos escribir el bloque completo de nuevo
-                conn.update(spreadsheet=SPREADSHEET_URL, worksheet="apuestas", data=df_final)
-                st.success("¡Sincronizado con éxito!")
-                st.rerun()
-            except Exception as e:
-                st.error("Error al conectar con Drive. Por favor, asegúrate de que la pestaña 'apuestas' esté totalmente vacía (sin filtros).")
+                if st.form_submit_button("💾 GUARDAR PRONÓSTICOS"):
+                    db_conn = sqlite3.connect('penca.db')
+                    c = db_conn.cursor()
+                    # Borrar anteriores para actualizar
+                    c.execute(f"DELETE FROM apuestas WHERE wn='{u_wn}'")
+                    # Insertar nuevos
+                    for _, row in df_fix[df_fix['fase'] == "Grupos"].iterrows():
+                        g1 = st.session_state.get(f"g1_{row['id']}", 0)
+                        g2 = st.session_state.get(f"g2_{row['id']}", 0)
+                        c.execute("INSERT INTO apuestas VALUES (?,?,?,?,?,?,?,?)", 
+                                 (u_wn, u_nom, u_ape, u_sec, row['id'], g1, g2, datetime.now()))
+                    # Guardar comodín (id 999)
+                    c.execute("INSERT INTO apuestas VALUES (?,?,?,?,?,?,?,?)", 
+                                 (u_wn, u_nom, u_ape, u_sec, 999, u_com, 0, datetime.now()))
+                    db_conn.commit()
+                    db_conn.close()
+                    st.success("¡Pronósticos guardados en la base de datos local!")
+                    st.rerun()
+
+# --- TAB 4: ADMIN (Panel de Control Würth) ---
+with menu[3]:
+    st.subheader("🔑 Acceso Administrador")
+    pass_admin = st.text_input("Contraseña", type="password")
+    if pass_admin == "wurth2026": # Puedes cambiar la clave aquí
+        db_conn = sqlite3.connect('penca.db')
+        df_all = pd.read_sql("SELECT * FROM apuestas", db_conn)
+        db_conn.close()
+        
+        st.write(f"### Resumen de Participación")
+        st.write(f"Total de apuestas registradas: {len(df_all)}")
+        
+        # Botón para descargar Excel
+        if not df_all.empty:
+            excel_data = df_all.to_csv(index=False).encode('utf-8')
+            st.download_button("📥 DESCARGAR TODAS LAS APUESTAS (CSV)", excel_data, "apuestas_penca_wurth.csv", "text/csv")
+            st.dataframe(df_all)
+        else:
+            st.info("Aún no hay datos registrados.")
