@@ -18,7 +18,7 @@ def init_db():
 
 init_db()
 
-# --- 2. FIXTURE COMPLETO (Sincronizado Grupos A al L) ---
+# --- 2. FIXTURE (Grupos A al L + Eliminatorias) ---
 def cargar_fixture():
     data = [
         # GRUPO A
@@ -29,16 +29,10 @@ def cargar_fixture():
         # GRUPO B
         {"id": 3, "fase": "Grupos", "grupo": "B", "e1": "Canadá 🇨🇦", "e2": "Bosnia 🇧🇦", "fecha": "12/06", "hora": "16:00"},
         {"id": 4, "fase": "Grupos", "grupo": "B", "e1": "Qatar 🇶🇦", "e2": "Suiza 🇨🇭", "fecha": "12/06", "hora": "20:00"},
-        {"id": 15, "fase": "Grupos", "grupo": "B", "e1": "Canadá 🇨🇦", "e2": "Qatar 🇶🇦", "fecha": "18/06", "hora": "16:00"},
-        # GRUPO C
-        {"id": 5, "fase": "Grupos", "grupo": "C", "e1": "Brasil 🇧🇷", "e2": "Haití 🇭🇹", "fecha": "13/06", "hora": "14:00"},
-        {"id": 6, "fase": "Grupos", "grupo": "C", "e1": "Marruecos 🇲🇦", "e2": "Escocia 🏴󠁧󠁢󠁳󠁣󠁴󠁿", "fecha": "13/06", "hora": "19:00"},
         # GRUPO F (Uruguay)
         {"id": 9, "fase": "Grupos", "grupo": "F", "e1": "Uruguay 🇺🇾", "e2": "Arabia S. 🇸🇦", "fecha": "15/06", "hora": "15:00"},
         {"id": 10, "fase": "Grupos", "grupo": "F", "e1": "España 🇪🇸", "e2": "Cabo Verde 🇨🇻", "fecha": "15/06", "hora": "19:00"},
         {"id": 30, "fase": "Grupos", "grupo": "F", "e1": "Uruguay 🇺🇾", "e2": "España 🇪🇸", "fecha": "20/06", "hora": "21:00"},
-        # GRUPO J
-        {"id": 50, "fase": "Grupos", "grupo": "J", "e1": "Argentina 🇦🇷", "e2": "Argelia 🇩🇿", "fecha": "18/06", "hora": "21:00"},
     ]
     # Estructura de Eliminatorias
     eliminatorias = [
@@ -74,7 +68,7 @@ st.markdown("""
         font-weight: bold; font-size: 16px; margin-top: 20px;
         display: flex; align-items: center; justify-content: space-between;
     }
-    .status-text { font-size: 12px; color: #28a745; font-weight: bold; font-style: italic; }
+    .status-text { font-size: 12px; color: #28a745; font-weight: bold; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -94,9 +88,10 @@ with menu[0]:
     u_nom = c1.text_input("Nombre:").strip()
     u_ape = c2.text_input("Apellido:").strip()
     u_wn = c3.text_input("Código WN:").strip().upper()
-    u_sec = c4.selectbox("Sector:", ["Ventas", "Marketing", "Logística", "IT", "Administración", "RRHH", "Otros"])
+    u_sec = c4.selectbox("Sector:", ["Ventas", "Marketing", "Logística", "IT", "Administración", "RRHH", "Otros"], index=None, placeholder="Selecciona tu sector...")
 
-    if u_nom and u_ape and u_wn:
+    # Solo activar si todos los campos están completos
+    if all([u_nom, u_ape, u_wn, u_sec]):
         db_conn = sqlite3.connect('penca.db')
         df_u = pd.read_sql(f"SELECT * FROM apuestas WHERE wn='{u_wn}'", db_conn)
         db_conn.close()
@@ -120,12 +115,14 @@ with menu[0]:
             dias = sorted(df_g['fecha'].unique(), key=lambda x: datetime.strptime(x, "%d/%m"))
             tabs_dias = st.tabs([f"📅 {d}" for d in dias])
 
-            with st.form("penca_v3_form"):
-                for i, dia in enumerate(dias):
-                    with tabs_dias[i]:
+            for i, dia in enumerate(dias):
+                with tabs_dias[i]:
+                    # Cada día tiene su propio formulario independiente
+                    with st.form(key=f"form_dia_{dia}"):
                         partidos_dia = df_g[df_g['fecha'] == dia]
+                        ids_dia = partidos_dia['id'].tolist()
+                        
                         for _, row in partidos_dia.iterrows():
-                            # LÓGICA DE TICK INDIVIDUAL: Solo si existe registro en DB
                             v1, v2, guardado = 0, 0, False
                             if not df_u.empty:
                                 prev = df_u[df_u['partido_id'] == row['id']]
@@ -145,50 +142,52 @@ with menu[0]:
                             cp, cg1, cg2 = st.columns([4, 1, 1])
                             cp.markdown(f"<div style='padding-top:20px;'><b>{row['e1']}</b> vs <b>{row['e2']}</b></div>", unsafe_allow_html=True)
                             st.session_state[f"g1_{row['id']}"] = cg1.number_input("L", 0, 20, v1, key=f"in_g1_{row['id']}")
-                            st.session_state[f"g2_{row['id']}"] = cg2.number_input("V", 0, 20, v2, key=f"in_e2_{row['id']}")
+                            st.session_state[f"g2_{row['id']}"] = cg2.number_input("V", 0, 20, v2, key=f"in_g2_{row['id']}")
 
-                st.warning("⚠️ Al presionar guardar, se registrarán todos los pronósticos visibles arriba.")
-                if st.form_submit_button("💾 GUARDAR TODOS LOS PRONÓSTICOS"):
-                    db_conn = sqlite3.connect('penca.db')
-                    c = db_conn.cursor()
-                    # Borrar solo lo del usuario actual
-                    c.execute(f"DELETE FROM apuestas WHERE wn='{u_wn}'")
-                    # Guardar solo los partidos que están en el fixture actual
-                    for _, p_row in df_fixture.iterrows():
-                        # Obtenemos los valores de los inputs usando la key única
-                        g1 = st.session_state.get(f"in_g1_{p_row['id']}", 0)
-                        g2 = st.session_state.get(f"in_e2_{p_row['id']}", 0)
-                        c.execute("INSERT INTO apuestas VALUES (?,?,?,?,?,?,?,?)", 
-                                 (u_wn, u_nom, u_ape, u_sec, p_row['id'], g1, g2, datetime.now().strftime("%Y-%m-%d %H:%M")))
-                    # Guardar comodín
-                    c.execute("INSERT INTO apuestas VALUES (?,?,?,?,?,?,?,?)", 
-                             (u_wn, u_nom, u_ape, u_sec, 999, cur_com, 0, datetime.now().strftime("%Y-%m-%d %H:%M")))
-                    db_conn.commit()
-                    db_conn.close()
-                    st.success("¡Pronósticos actualizados correctamente!")
-                    st.rerun()
+                        if st.form_submit_button(f"💾 Guardar Pronósticos de {dia}"):
+                            db_conn = sqlite3.connect('penca.db')
+                            c = db_conn.cursor()
+                            
+                            # Borrar solo los partidos de ESTE día para ESTE usuario
+                            ids_str = ",".join(map(str, ids_dia))
+                            c.execute(f"DELETE FROM apuestas WHERE wn='{u_wn}' AND partido_id IN ({ids_str})")
+                            
+                            # Insertar los resultados del día
+                            for pid in ids_dia:
+                                g1 = st.session_state.get(f"in_g1_{pid}", 0)
+                                g2 = st.session_state.get(f"in_g2_{pid}", 0)
+                                c.execute("INSERT INTO apuestas VALUES (?,?,?,?,?,?,?,?)", 
+                                         (u_wn, u_nom, u_ape, u_sec, pid, g1, g2, datetime.now().strftime("%Y-%m-%d %H:%M")))
+                            
+                            # Actualizar Comodín si es necesario
+                            c.execute(f"DELETE FROM apuestas WHERE wn='{u_wn}' AND partido_id=999")
+                            c.execute("INSERT INTO apuestas VALUES (?,?,?,?,?,?,?,?)", 
+                                     (u_wn, u_nom, u_ape, u_sec, 999, cur_com, 0, datetime.now().strftime("%Y-%m-%d %H:%M")))
+                            
+                            db_conn.commit()
+                            db_conn.close()
+                            st.success(f"¡Pronósticos de {dia} guardados!")
+                            st.rerun()
 
 # --- TAB 4: ADMIN ---
 with menu[3]:
     st.subheader("🔒 Panel Administrativo")
-    # Usamos un formulario para el login para evitar recargas raras
-    with st.form("admin_gate"):
-        input_pass = st.text_input("Contraseña:", type="password")
-        acceder = st.form_submit_button("Acceder")
-
-    if acceder or st.session_state.get("admin_ok"):
-        if input_pass == "market1NG?" or st.session_state.get("admin_ok"):
-            st.session_state.admin_ok = True
-            st.success("Acceso concedido.")
-            db_conn = sqlite3.connect('penca.db')
-            df_admin = pd.read_sql("SELECT * FROM apuestas", db_conn)
-            db_conn.close()
-            
-            if not df_admin.empty:
-                csv = df_admin.to_csv(index=False).encode('utf-8')
-                st.download_button("📥 Descargar Base de Datos (CSV)", csv, "penca_export.csv", "text/csv")
-                st.dataframe(df_admin)
+    with st.form("admin_auth_form"):
+        pass_input = st.text_input("Contraseña:", type="password")
+        if st.form_submit_button("Acceder"):
+            if pass_input == "market1NG?":
+                st.session_state.admin_logged = True
             else:
-                st.info("Aún no hay datos registrados en la base de datos.")
+                st.error("Clave incorrecta")
+
+    if st.session_state.get("admin_logged"):
+        db_conn = sqlite3.connect('penca.db')
+        df_admin = pd.read_sql("SELECT * FROM apuestas", db_conn)
+        db_conn.close()
+        
+        if not df_admin.empty:
+            csv = df_admin.to_csv(index=False).encode('utf-8')
+            st.download_button("📥 Descargar Base de Datos (CSV)", csv, "penca_wurth_full.csv", "text/csv")
+            st.dataframe(df_admin)
         else:
-            st.error("Contraseña incorrecta.")
+            st.info("Sin datos registrados.")
