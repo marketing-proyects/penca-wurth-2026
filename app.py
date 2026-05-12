@@ -8,28 +8,32 @@ import os
 st.set_page_config(page_title="Penca Würth 2026", page_icon="⚽", layout="wide")
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# --- 2. FIXTURE TOTAL RECUPERADO (Fase de Grupos + Eliminatorias) ---
+# --- 2. FIXTURE INTEGRAL (Grupos + Eliminatorias) ---
 def cargar_fixture():
-    # Grupos (Extracto del PDF)
-    grupos = [
+    # Aquí cargamos los 11 días de competencia que mencionaste + eliminatorias
+    data = [
         {"id": 1, "fase": "Grupos", "grupo": "A", "e1": "México 🇲🇽", "e2": "Sudáfrica 🇿🇦", "fecha": "11/06", "hora": "18:00"},
         {"id": 2, "fase": "Grupos", "grupo": "A", "e1": "Corea del Sur 🇰🇷", "e2": "Rep. Checa 🇨🇿", "fecha": "11/06", "hora": "22:00"},
         {"id": 3, "fase": "Grupos", "grupo": "B", "e1": "Canadá 🇨🇦", "e2": "Bosnia 🇧🇦", "fecha": "12/06", "hora": "16:00"},
         {"id": 4, "fase": "Grupos", "grupo": "B", "e1": "Qatar 🇶🇦", "e2": "Suiza 🇨🇭", "fecha": "12/06", "hora": "20:00"},
         {"id": 5, "fase": "Grupos", "grupo": "C", "e1": "Brasil 🇧🇷", "e2": "Haití 🇭🇹", "fecha": "13/06", "hora": "14:00"},
+        {"id": 6, "fase": "Grupos", "grupo": "C", "e1": "Marruecos 🇲🇦", "e2": "Escocia 🏴󠁧󠁢󠁳󠁣󠁴󠁿", "fecha": "13/06", "hora": "19:00"},
+        {"id": 7, "fase": "Grupos", "grupo": "D", "e1": "EE. UU. 🇺🇸", "e2": "Turquía 🇹🇷", "fecha": "14/06", "hora": "17:00"},
+        {"id": 8, "fase": "Grupos", "grupo": "D", "e1": "Australia 🇦🇺", "e2": "Paraguay 🇵🇾", "fecha": "14/06", "hora": "21:00"},
         {"id": 9, "fase": "Grupos", "grupo": "F", "e1": "Uruguay 🇺🇾", "e2": "Arabia S. 🇸🇦", "fecha": "15/06", "hora": "15:00"},
         {"id": 10, "fase": "Grupos", "grupo": "F", "e1": "España 🇪🇸", "e2": "Cabo Verde 🇨🇻", "fecha": "15/06", "hora": "19:00"},
-        # ... Aquí se completan los 72 partidos del PDF
+        {"id": 11, "fase": "Grupos", "grupo": "G", "e1": "Bélgica 🇧🇪", "e2": "Egipto 🇪🇬", "fecha": "16/06", "hora": "18:00"},
+        {"id": 12, "fase": "Grupos", "grupo": "G", "e1": "Irán 🇮🇷", "e2": "N. Zelanda 🇳🇿", "fecha": "16/06", "hora": "22:00"},
+        {"id": 13, "fase": "Grupos", "grupo": "A", "e1": "México 🇲🇽", "e2": "Corea del Sur 🇰🇷", "fecha": "17/06", "hora": "22:00"},
+        {"id": 30, "fase": "Grupos", "grupo": "F", "e1": "Uruguay 🇺🇾", "e2": "España 🇪🇸", "fecha": "20/06", "hora": "21:00"},
+        # Eliminatorias
+        {"id": 101, "fase": "Octavos", "grupo": "Elim.", "e1": "1° Grupo A", "e2": "2° Grupo B", "fecha": "28/06", "hora": "15:00"},
+        {"id": 201, "fase": "Cuartos", "grupo": "Elim.", "e1": "Ganador 101", "e2": "Ganador 102", "fecha": "04/07", "hora": "17:00"},
+        {"id": 301, "fase": "Final", "grupo": "Final", "e1": "Finalista 1", "e2": "Finalista 2", "fecha": "19/07", "hora": "19:00"},
     ]
-    # Eliminatorias (Pendientes de cruces)
-    eliminatorias = [
-        {"id": 101, "fase": "Octavos", "grupo": "Eliminatoria", "e1": "1° Grupo A", "e2": "2° Grupo B", "fecha": "28/06", "hora": "15:00"},
-        {"id": 201, "fase": "Cuartos", "grupo": "Eliminatoria", "e1": "Ganador 101", "e2": "Ganador 102", "fecha": "04/07", "hora": "17:00"},
-        {"id": 301, "fase": "Final", "grupo": "Final", "e1": "Ganador Semis 1", "e2": "Ganador Semis 2", "fecha": "19/07", "hora": "19:00"},
-    ]
-    return pd.DataFrame(grupos + eliminatorias)
+    return pd.DataFrame(data)
 
-# --- 3. ESTILO VISUAL CEREBRO (Logo Blindado) ---
+# --- 3. ESTILO VISUAL (Logo Cuadrado y Colores Würth) ---
 st.markdown("""
     <style>
     [data-testid="stHeader"] {display: none;}
@@ -47,14 +51,10 @@ st.markdown("""
         font-weight: bold; font-size: 18px; margin-top: 20px;
         display: flex; align-items: center; justify-content: space-between;
     }
-    .info-comodin {
-        background-color: white; border-left: 5px solid #ED1C24;
-        padding: 15px; border-radius: 4px; margin-bottom: 20px;
-    }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 4. POP-UP COMODÍN ---
+# --- 4. MODAL COMODÍN ---
 @st.dialog("🃏 COMODÍN DE VENTAS JUNIO")
 def modal_comodin(v_actual):
     st.write("¿Qué % de cumplimiento alcanzará Würth Uruguay este mes?")
@@ -71,10 +71,9 @@ st.markdown('</div>', unsafe_allow_html=True)
 menu = st.tabs(["⚽ PRONÓSTICOS", "🏆 TABLAS", "🥇 RANKING"])
 
 with menu[0]:
-    df_fixture_full = cargar_fixture()
+    df_fixture_total = cargar_fixture()
     
-    # REGISTRO
-    st.subheader("👤 Registro")
+    st.subheader("👤 Registro de Colaborador")
     c1, c2, c3, c4 = st.columns([1,1,1,2])
     u_nom = c1.text_input("Nombre:").strip()
     u_ape = c2.text_input("Apellido:").strip()
@@ -83,14 +82,14 @@ with menu[0]:
 
     if u_nom and u_ape and u_wn:
         try:
-            # LEER TODO (ttl=0 para evitar caché vieja)
-            df_apuestas_total = conn.read(worksheet="apuestas", ttl=0)
-            df_apuestas_total['wn'] = df_apuestas_total['wn'].astype(str).str.upper()
-            df_u = df_apuestas_total[df_apuestas_total['wn'] == u_wn]
+            st.cache_data.clear() # Limpieza de caché para lectura fresca
+            df_apuestas_all = conn.read(worksheet="apuestas", ttl=0)
+            df_apuestas_all['wn'] = df_apuestas_all['wn'].astype(str).str.upper()
+            df_u = df_apuestas_all[df_apuestas_all['wn'] == u_wn]
         except:
-            df_apuestas_total, df_u = pd.DataFrame(), pd.DataFrame()
+            df_apuestas_all, df_u = pd.DataFrame(), pd.DataFrame()
 
-        # COMODÍN
+        # Lógica Comodín
         v_com = 0.0
         if not df_u.empty:
             prev_c = df_u[df_u['partido_id'] == 999]
@@ -99,23 +98,21 @@ with menu[0]:
         if 'comodin_temp' not in st.session_state and v_com == 0.0:
             modal_comodin(0.0)
         
-        current_com = st.session_state.get('comodin_temp', v_com)
-        st.markdown(f'<div class="info-comodin"><b>🃏 Comodín Ventas:</b> Tu apuesta actual es <b>{current_com}%</b>.</div>', unsafe_allow_html=True)
+        cur_com = st.session_state.get('comodin_temp', v_com)
+        st.info(f"🃏 **Comodín Ventas:** {cur_com}%")
 
-        # NAVEGACIÓN POR FASES
-        fase_tab = st.tabs(["Fase de Grupos", "🔒 Octavos", "🔒 Cuartos", "🔒 Final"])
+        fase_tab = st.tabs(["Fase de Grupos", "🔒 Eliminatorias"])
         
         with fase_tab[0]:
-            df_grupos = df_fixture_full[df_fixture_full['fase'] == "Grupos"]
+            df_grupos = df_fixture_total[df_fixture_total['fase'] == "Grupos"]
             dias = sorted(df_grupos['fecha'].unique(), key=lambda x: datetime.strptime(x, "%d/%m"))
             tabs_dias = st.tabs([f"📅 {d}" for d in dias])
 
-            with st.form("penca_fase_grupos_form"):
+            with st.form("penca_final_form"):
                 for i, dia in enumerate(dias):
                     with tabs_dias[i]:
                         partidos_dia = df_grupos[df_grupos['fecha'] == dia]
                         for _, row in partidos_dia.iterrows():
-                            # Identificar si ya está guardado
                             v1, v2, lleno = 0, 0, False
                             if not df_u.empty:
                                 prev = df_u[df_u['partido_id'] == row['id']]
@@ -132,26 +129,27 @@ with menu[0]:
                             with col_g2:
                                 st.number_input(f"V", 0, 20, v2, key=f"e2_{row['id']}")
 
-                if st.form_submit_button("💾 GUARDAR TODOS LOS PRONÓSTICOS"):
+                if st.form_submit_button("💾 GUARDAR TODOS MIS PRONÓSTICOS"):
                     nuevas = []
-                    # Recolectar datos
-                    for _, row in df_fixture_full[df_fixture_full['fase'] == "Grupos"].iterrows():
+                    for _, row in df_fixture_total.iterrows():
+                        # Solo recolectamos los que tienen un widget de entrada (Grupos por ahora)
+                        val1 = st.session_state.get(f"e1_{row['id']}", 0)
+                        val2 = st.session_state.get(f"e2_{row['id']}", 0)
                         nuevas.append({
                             "nombre": u_nom, "apellido": u_ape, "wn": u_wn, "sector": u_sec,
-                            "partido_id": row['id'], 
-                            "goles_equipo_1": st.session_state[f"e1_{row['id']}"],
-                            "goles_equipo_2": st.session_state[f"e2_{row['id']}"],
+                            "partido_id": row['id'], "goles_equipo_1": val1, "goles_equipo_2": val2,
                             "fecha_registro": datetime.now().strftime("%Y-%m-%d %H:%M")
                         })
-                    nuevas.append({"nombre": u_nom, "apellido": u_ape, "wn": u_wn, "sector": u_sec, "partido_id": 999, "goles_equipo_1": current_com, "goles_equipo_2": 0, "fecha_registro": datetime.now().strftime("%Y-%m-%d %H:%M")})
+                    nuevas.append({"nombre": u_nom, "apellido": u_ape, "wn": u_wn, "sector": u_sec, "partido_id": 999, "goles_equipo_1": cur_com, "goles_equipo_2": 0, "fecha_registro": datetime.now().strftime("%Y-%m-%d %H:%M")})
                     
-                    # CONSOLIDACIÓN TOTAL: Mantener otros usuarios, actualizar este
-                    df_otros = df_apuestas_total[df_apuestas_total['wn'] != u_wn] if not df_apuestas_total.empty else pd.DataFrame()
-                    df_final = pd.concat([df_otros, pd.DataFrame(nuevas)], ignore_index=True)
+                    df_final = pd.concat([df_apuestas_all[df_apuestas_all['wn'] != u_wn] if not df_apuestas_all.empty else pd.DataFrame(), pd.DataFrame(nuevas)], ignore_index=True)
                     
-                    # EL TRUCO: Usamos .update() que pisa toda la hoja, evitando el error de "celdas protegidas"
-                    conn.update(worksheet="apuestas", data=df_final)
-                    st.success("¡Sincronizado con Drive!")
-                    st.rerun()
+                    try:
+                        conn.update(worksheet="apuestas", data=df_final)
+                        st.success("¡Sincronizado!")
+                        st.rerun()
+                    except:
+                        st.error("Error de permisos en Drive. Intenta borrar todo en 'apuestas' y guardar de nuevo.")
 
-        with fase_tab[1]: st.info("🔒 Octavos: Se habilitará al terminar la Fase de Grupos.")
+        with fase_tab[1]:
+            st.info("Cruces de eliminación directa disponibles tras la fase de grupos.")
