@@ -14,7 +14,7 @@ st.set_page_config(
 # Conexión a Google Sheets
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# --- 2. CSS: ESTILO CEREBRO CON GRADIENTE ---
+# --- 2. CSS: ESTILO CEREBRO CON GRADIENTE DIRECCIONAL ---
 st.markdown("""
     <style>
     #MainMenu {visibility: hidden;}
@@ -27,7 +27,7 @@ st.markdown("""
             to right, 
             rgba(255, 255, 255, 0.98) 0%, 
             rgba(255, 255, 255, 0.92) 50%, 
-            rgba(255, 255, 255, 0.80) 100%
+            rgba(255, 255, 255, 0.82) 100%
         ), 
         url("https://images.unsplash.com/photo-1574629810360-7efbbe195018?q=80&w=2093&auto=format&fit=crop");
         background-size: cover;
@@ -35,11 +35,11 @@ st.markdown("""
         background-attachment: fixed;
     }
 
-    /* Blindaje de Logo Técnica CEREBRO */
+    /* Blindaje de Logo Técnica CEREBRO (Esquinas Rectas) */
     [data-testid="stImage"] img { border-radius: 0px !important; }
     .logo-box-cerebro {
         background-color: white !important;
-        padding: 5px !important;
+        padding: 4px !important;
         border-radius: 0px !important;
         display: inline-block;
         line-height: 0;
@@ -56,15 +56,18 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. FUNCIONES DE DATOS ---
+# --- 3. FUNCIONES DE DATOS (MÁXIMA COMPATIBILIDAD) ---
 def obtener_datos(pestana):
     try:
-        # Forzamos ttl=0 para ignorar el caché que causa el error de la imagen
+        # ttl=0 ignora el caché para evitar el error de la imagen d3e358
         df = conn.read(worksheet=pestana, ttl=0)
-        # Limpiamos espacios en blanco en los nombres de las columnas
-        df.columns = [str(c).strip().lower() for c in df.columns]
+        if df is not None:
+            # Limpiamos nombres de columnas (quitar espacios y pasar a minúsculas)
+            df.columns = [str(c).strip().lower() for c in df.columns]
+            # Eliminamos filas que estén totalmente vacías
+            df = df.dropna(how='all')
         return df
-    except Exception as e:
+    except Exception:
         return pd.DataFrame()
 
 # --- 4. RENDERIZADO CABECERA ---
@@ -72,6 +75,7 @@ st.markdown('<div class="logo-box-cerebro">', unsafe_allow_html=True)
 if os.path.exists("logo_wurth.jpg"):
     st.image("logo_wurth.jpg", width=220)
 else:
+    # Backup por si el archivo no está
     st.image("https://upload.wikimedia.org/wikipedia/commons/1/1e/Wuerth_Logo_2024.svg", width=220)
 st.markdown('</div>', unsafe_allow_html=True)
 
@@ -84,12 +88,12 @@ with tab1:
     st.markdown("<br>", unsafe_allow_html=True)
     df_partidos = obtener_datos("partidos")
 
-    # Verificamos columnas necesarias (ahora en minúsculas por la limpieza del punto 3)
-    cols_necesarias = ['id', 'local', 'visitante']
+    # Columnas que sí o sí necesitamos
+    cols_ok = ['id', 'local', 'visitante']
     
-    if not df_partidos.empty and all(c in df_partidos.columns for c in cols_necesarias):
+    if not df_partidos.empty and all(c in df_partidos.columns for c in cols_ok):
         with st.form("form_penca"):
-            usuario = st.text_input("Participante:", placeholder="Ingresa tu nombre")
+            usuario = st.text_input("Participante:", placeholder="Tu nombre")
             st.divider()
             
             respuestas = []
@@ -97,7 +101,9 @@ with tab1:
                 col1, col2 = st.columns([3, 2])
                 with col1:
                     st.markdown(f"**{row['local']} vs {row['visitante']}**")
-                    st.caption(f"{row.get('fecha', '-')} | {row.get('hora_uy', '-')} hs")
+                    fecha = row.get('fecha', '-')
+                    hora = row.get('hora_uy', '-')
+                    st.caption(f"{fecha} | {hora} hs")
                 
                 with col2:
                     c1, c2 = st.columns(2)
@@ -120,21 +126,21 @@ with tab1:
                         df_actual = obtener_datos("apuestas")
                         df_final = pd.concat([df_actual, df_nuevas], ignore_index=True)
                         conn.update(worksheet="apuestas", data=df_final)
-                        st.success(f"✅ ¡Todo guardado, {usuario}!")
+                        st.success(f"✅ ¡Guardado con éxito, {usuario}!")
                     except:
-                        st.error("Error al guardar. Asegúrate de tener la pestaña 'apuestas'.")
+                        st.error("Error al guardar. Revisa que exista la pestaña 'apuestas' en el Excel.")
                 else:
-                    st.error("⚠️ El nombre es obligatorio.")
+                    st.error("⚠️ Por favor ingresa tu nombre.")
     else:
         st.warning("⚠️ No se detectan datos en la pestaña 'partidos'.")
         if not df_partidos.empty:
-            st.write("Columnas encontradas:", list(df_partidos.columns))
-            st.info("Revisa que la fila 1 del Excel tenga: id, fecha, hora_uy, local, visitante.")
+            st.write("Columnas leídas:", list(df_partidos.columns))
+            st.info("Asegúrate de que la Fila 1 tenga los nombres: id, fecha, hora_uy, local, visitante.")
 
 with tab2:
     st.header("📊 Desafío Ventas")
-    st.info("Módulo de cumplimiento.")
+    st.write("Seguimiento de cumplimiento.")
 
 with tab3:
     st.header("🥇 Ranking")
-    st.info("Ranking oficial de la Penca.")
+    st.write("Tabla de posiciones general.")
