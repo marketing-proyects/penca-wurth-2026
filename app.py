@@ -4,15 +4,16 @@ import sqlite3
 from datetime import datetime
 import os
 
-# --- 1. CONFIGURACIÓN E INICIALIZACIÓN ---
+# --- 1. CONFIGURACIÓN ---
 st.set_page_config(page_title="Penca Würth 2026", page_icon="⚽", layout="wide")
 
+# Inicialización de estados de sesión
 if "admin_logged" not in st.session_state:
     st.session_state.admin_logged = False
 if "comodin_temp" not in st.session_state:
     st.session_state.comodin_temp = None
 
-# URL DE DESCARGA DIRECTA DE GITHUB
+# URL RAW DE TU GITHUB (Ya integrada con tu link de descarga directa)
 URL_RESULTADOS_REALES = "https://github.com/marketing-proyects/penca-wurth-2026/raw/5ea13ebda06c41af8cdf217dbe63d396b9ba4bb4/Maestro_Resultados_Penca_Wurth_2026_Final.xlsx"
 
 def init_db():
@@ -26,7 +27,7 @@ def init_db():
 
 init_db()
 
-# --- 2. FIXTURE MAESTRO (72 Grupos + 32 Eliminatorias) ---
+# --- 2. FIXTURE INTEGRAL (72 Grupos A al L + 32 Eliminatorias) ---
 def cargar_fixture():
     groups_data = {
         "A": ["Mexico", "Sudafrica", "Corea del Sur", "Rep. Checa"],
@@ -45,22 +46,27 @@ def cargar_fixture():
     
     matches = []
     match_id = 1
-    for group_name, teams in groups_data.items():
+    for g_name, teams in groups_data.items():
+        # Fechas lógicas del PDF
         dates = ["11/06", "11/06", "17/06", "17/06", "22/06", "22/06"]
-        if group_name in ["D", "E", "F"]: dates = ["14/06", "15/06", "19/06", "20/06", "24/06", "25/06"]
-        if group_name in ["G", "H", "I"]: dates = ["16/06", "17/06", "21/06", "22/06", "26/06", "27/06"]
-        if group_name in ["J", "K", "L"]: dates = ["18/06", "19/06", "24/06", "25/06", "28/06", "29/06"]
+        if g_name in ["D", "E", "F"]: dates = ["14/06", "15/06", "19/06", "20/06", "24/06", "25/06"]
+        if g_name in ["G", "H", "I"]: dates = ["16/06", "17/06", "21/06", "22/06", "26/06", "27/06"]
+        if g_name in ["J", "K", "L"]: dates = ["18/06", "19/06", "24/06", "25/06", "28/06", "29/06"]
         
         pairs = [(teams[0], teams[1]), (teams[2], teams[3]), (teams[0], teams[2]), (teams[1], teams[3]), (teams[3], teams[0]), (teams[1], teams[2])]
         for i, pair in enumerate(pairs):
             matches.append({
-                "id": match_id, "fase": "Grupos", "grupo": group_name,
+                "id": match_id, "fase": "Grupos", "grupo": g_name,
                 "e1": pair[0], "e2": pair[1], "fecha": dates[i], "hora": "18:00" if i%2==0 else "22:00"
             })
             match_id += 1
     
-    for i in range(73, 105):
-        matches.append({"id": i, "fase": "Eliminatorias", "grupo": "Finales", "e1": f"Clasificado {i}A", "e2": f"Clasificado {i}B", "fecha": "Julio", "hora": "19:00"})
+    # Restauración de Eliminatorias (IDs 73-104)
+    fases_elim = [("Ronda de 32", 16), ("Octavos", 8), ("Cuartos", 4), ("Semis", 2), ("Tercer Puesto", 1), ("Final", 1)]
+    for f_nom, cant in fases_elim:
+        for _ in range(cant):
+            matches.append({"id": match_id, "fase": f_nom, "grupo": "Eliminatoria", "e1": f"Equipo {match_id}A", "e2": f"Equipo {match_id}B", "fecha": "Julio", "hora": "20:00"})
+            match_id += 1
     return pd.DataFrame(matches)
 
 # --- 3. DIÁLOGO COMODÍN ---
@@ -68,12 +74,12 @@ def cargar_fixture():
 def modal_comodin(v_actual):
     st.markdown("##### ¿Qué porcentaje de cumplimiento alcanzará Würth Uruguay este mes?")
     val = st.number_input("Tu apuesta (%):", 0.0, 200.0, v_actual, step=0.1)
-    st.caption("50 pts al exacto | 10 pts al Top 10 más cercano.")
+    st.caption("Lógica: 50 pts al exacto | 10 pts al Top 10 más cercano.")
     if st.button("Confirmar Apuesta"):
         st.session_state.comodin_temp = val
         st.rerun()
 
-# --- 4. ESTILO VISUAL ---
+# --- 4. ESTILO VISUAL (Logo Recto Würth) ---
 st.markdown("""
     <style>
     [data-testid="stHeader"] {display: none;}
@@ -110,14 +116,11 @@ with menu[0]:
     u_nom = c1.text_input("Nombre:").strip()
     u_ape = c2.text_input("Apellido:").strip()
     u_wn = c3.text_input("Código WN:").strip().upper()
-    
-    # LISTA DE SECTORES CORREGIDA
     sectores = ["Finanzas", "Compras", "Créditos", "RRHH", "IT", "Dirección", "Logistica", "Televentas", "Tiendas", "e-Commerce", "Ventas", "Marketing", "Sales Operation", "Otro"]
     u_sec = c4.selectbox("Sector:", sectores, index=None, placeholder="Selecciona tu sector...")
 
     if all([u_nom, u_ape, u_wn, u_sec]):
         db_conn = sqlite3.connect('penca.db')
-        # Cargamos específicamente qué IDs ya tiene este usuario guardados
         df_u = pd.read_sql(f"SELECT partido_id, g1, g2 FROM apuestas WHERE wn='{u_wn}'", db_conn)
         db_conn.close()
 
@@ -144,7 +147,7 @@ with menu[0]:
                         partidos_dia = df_g[df_g['fecha'] == dia]
                         ids_dia = partidos_dia['id'].tolist()
                         for _, row in partidos_dia.iterrows():
-                            # LÓGICA DE VALIDACIÓN INDIVIDUAL DE TICK ✅
+                            # Lógica estricta de TICK individual
                             v1, v2, guardado = 0, 0, False
                             if row['id'] in df_u['partido_id'].values:
                                 reg = df_u[df_u['partido_id'] == row['id']].iloc[0]
@@ -156,6 +159,7 @@ with menu[0]:
                             st.markdown(f'<div class="grupo-header-card"><span>GRUPO {row["grupo"]}{tick}</span><span>{row["hora"]} hs (UY)</span> {status}</div>', unsafe_allow_html=True)
                             cp, cg1, cg2 = st.columns([4, 1, 1])
                             cp.markdown(f"<div style='padding-top:20px;'><b>{row['e1']}</b> vs <b>{row['e2']}</b></div>", unsafe_allow_html=True)
+                            # Captura de datos forzada
                             st.session_state[f"g1_{row['id']}"] = cg1.number_input("L", 0, 20, v1, key=f"in_g1_{row['id']}")
                             st.session_state[f"g2_{row['id']}"] = cg2.number_input("V", 0, 20, v2, key=f"in_e2_{row['id']}")
 
@@ -163,13 +167,13 @@ with menu[0]:
                             db_conn = sqlite3.connect('penca.db')
                             c = db_conn.cursor()
                             ids_str = ",".join(map(str, ids_dia))
-                            # Borramos solo lo que corresponde a este día específico
                             c.execute(f"DELETE FROM apuestas WHERE wn='{u_wn}' AND partido_id IN ({ids_str})")
                             for pid in ids_dia:
-                                g1 = st.session_state.get(f"in_g1_{pid}", 0)
-                                g2 = st.session_state.get(f"in_g2_{pid}", 0)
-                                c.execute("INSERT INTO apuestas VALUES (?,?,?,?,?,?,?,?)", (u_wn, u_nom, u_ape, u_sec, pid, g1, g2, datetime.now().strftime("%Y-%m-%d %H:%M")))
-                            # Sincronizamos el comodín también al guardar el día
+                                # Leemos directamente del session_state para no perder el 4-4 o cualquier cambio
+                                g1_final = st.session_state[f"in_g1_{pid}"]
+                                g2_final = st.session_state[f"in_e2_{pid}"]
+                                c.execute("INSERT INTO apuestas VALUES (?,?,?,?,?,?,?,?)", (u_wn, u_nom, u_ape, u_sec, pid, g1_final, g2_final, datetime.now().strftime("%Y-%m-%d %H:%M")))
+                            # Sincronizar Comodín
                             c.execute(f"DELETE FROM apuestas WHERE wn='{u_wn}' AND partido_id=999")
                             c.execute("INSERT INTO apuestas VALUES (?,?,?,?,?,?,?,?)", (u_wn, u_nom, u_ape, u_sec, 999, cur_com, 0, datetime.now().strftime("%Y-%m-%d %H:%M")))
                             db_conn.commit()
@@ -182,7 +186,7 @@ with menu[0]:
 
 # --- TAB 2: TABLAS ---
 with menu[1]:
-    st.subheader("📊 Composición de Grupos")
+    st.subheader("📊 Composición de Grupos Oficial")
     df_fix_all = cargar_fixture()
     grupos_lista = sorted(df_fix_all[df_fix_all['fase']=='Grupos']['grupo'].unique())
     cols = st.columns(3)
@@ -214,11 +218,11 @@ with menu[3]:
             df_admin = pd.read_sql("SELECT * FROM apuestas", db_conn)
             db_conn.close()
             if not df_admin.empty:
-                st.success("Base de datos conectada con éxito.")
+                st.success("Base de datos conectada.")
                 csv = df_admin.to_csv(index=False).encode('utf-8')
-                st.download_button("📥 Descargar CSV", csv, "penca_export.csv", "text/csv")
+                st.download_button("📥 Descargar CSV de Apuestas", csv, "penca_export_final.csv", "text/csv")
                 st.dataframe(df_admin)
             else:
-                st.info("La base de datos está vacía por ahora.")
+                st.info("La base de datos está vacía.")
         except:
-            st.error("Error: Todavía no hay apuestas registradas para crear la base de datos.")
+            st.error("Error al cargar los datos.")
