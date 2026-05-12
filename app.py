@@ -13,7 +13,7 @@ if "admin_logged" not in st.session_state:
 if "comodin_temp" not in st.session_state:
     st.session_state.comodin_temp = None
 
-# URL RAW DE TU GITHUB (Ya integrada con tu link de descarga directa)
+# URL RAW DE TU GITHUB
 URL_RESULTADOS_REALES = "https://github.com/marketing-proyects/penca-wurth-2026/raw/5ea13ebda06c41af8cdf217dbe63d396b9ba4bb4/Maestro_Resultados_Penca_Wurth_2026_Final.xlsx"
 
 def init_db():
