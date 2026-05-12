@@ -8,36 +8,28 @@ import os
 st.set_page_config(page_title="Penca Würth 2026", page_icon="⚽", layout="wide")
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# --- 2. FIXTURE COMPLETO (Extraído del PDF) ---
+# --- 2. FIXTURE COMPLETO (Sincronizado con tu PDF) ---
 def cargar_fixture():
     data = [
-        # 11 de Junio
         {"id": 1, "grupo": "A", "e1": "México 🇲🇽", "e2": "Sudáfrica 🇿🇦", "fecha": "11/06", "hora": "18:00"},
         {"id": 2, "grupo": "A", "e1": "Corea del Sur 🇰🇷", "e2": "Rep. Checa 🇨🇿", "fecha": "11/06", "hora": "22:00"},
-        # 12 de Junio
         {"id": 3, "grupo": "B", "e1": "Canadá 🇨🇦", "e2": "Bosnia 🇧🇦", "fecha": "12/06", "hora": "16:00"},
         {"id": 4, "grupo": "B", "e1": "Qatar 🇶🇦", "e2": "Suiza 🇨🇭", "fecha": "12/06", "hora": "20:00"},
-        # 13 de Junio
         {"id": 5, "grupo": "C", "e1": "Brasil 🇧🇷", "e2": "Haití 🇭🇹", "fecha": "13/06", "hora": "14:00"},
         {"id": 6, "grupo": "C", "e1": "Marruecos 🇲🇦", "e2": "Escocia 🏴󠁧󠁢󠁳󠁣󠁴󠁿", "fecha": "13/06", "hora": "19:00"},
-        # 14 de Junio
         {"id": 7, "grupo": "D", "e1": "EE. UU. 🇺🇸", "e2": "Turquía 🇹🇷", "fecha": "14/06", "hora": "17:00"},
         {"id": 8, "grupo": "D", "e1": "Australia 🇦🇺", "e2": "Paraguay 🇵🇾", "fecha": "14/06", "hora": "21:00"},
-        # 15 de Junio
         {"id": 9, "grupo": "F", "e1": "Uruguay 🇺🇾", "e2": "Arabia Saudita 🇸🇦", "fecha": "15/06", "hora": "15:00"},
         {"id": 10, "grupo": "F", "e1": "España 🇪🇸", "e2": "Cabo Verde 🇨🇻", "fecha": "15/06", "hora": "19:00"},
-        # 16 de Junio
-        {"id": 11, "grupo": "G", "e1": "Bélgica 🇧🇪", "e2": "Egipto 🇪🇬", "fecha": "16/06", "hora": "18:00"},
+        {"id": 11, "grupo": "G", "e1": "Bélgica 🇧🇪", "e2": "Egípto 🇪🇬", "fecha": "16/06", "hora": "18:00"},
         {"id": 12, "grupo": "G", "e1": "Irán 🇮🇷", "e2": "N. Zelanda 🇳🇿", "fecha": "16/06", "hora": "22:00"},
-        # 17 de Junio
         {"id": 13, "grupo": "A", "e1": "México 🇲🇽", "e2": "Corea del Sur 🇰🇷", "fecha": "17/06", "hora": "22:00"},
         {"id": 14, "grupo": "A", "e1": "Sudáfrica 🇿🇦", "e2": "Rep. Checa 🇨🇿", "fecha": "17/06", "hora": "18:00"},
-        # 20 de Junio
         {"id": 30, "grupo": "F", "e1": "Uruguay 🇺🇾", "e2": "España 🇪🇸", "fecha": "20/06", "hora": "21:00"},
     ]
     return pd.DataFrame(data)
 
-# --- 3. ESTILO VISUAL ---
+# --- 3. ESTILO VISUAL (Logo Blindado y Colores Würth) ---
 st.markdown("""
     <style>
     [data-testid="stHeader"] {display: none;}
@@ -66,7 +58,7 @@ st.markdown("""
 # --- 4. POP-UP COMODÍN ---
 @st.dialog("🃏 COMODÍN DE VENTAS JUNIO")
 def modal_comodin(v_actual):
-    st.write("¿Qué % de cumplimiento alcanzará Würth Uruguay este mes?")
+    st.write("¿Qué porcentaje de cumplimiento alcanzará Würth Uruguay este mes?")
     val = st.number_input("Tu apuesta:", 0.0, 200.0, v_actual, step=0.1)
     if st.button("Confirmar Comodín"):
         st.session_state.comodin_temp = val
@@ -82,7 +74,7 @@ menu = st.tabs(["⚽ PRONÓSTICOS", "🏆 TABLAS", "🥇 RANKING"])
 with menu[0]:
     df_fixture = cargar_fixture()
     
-    st.subheader("👤 Registro de Colaborador")
+    st.subheader("👤 Registro")
     c1, c2, c3, c4 = st.columns([1,1,1,2])
     u_nom = c1.text_input("Nombre:").strip()
     u_ape = c2.text_input("Apellido:").strip()
@@ -91,14 +83,13 @@ with menu[0]:
 
     if u_nom and u_ape and u_wn:
         try:
-            # Leemos los datos actuales
             df_apuestas = conn.read(worksheet="apuestas", ttl=0)
             df_apuestas['wn'] = df_apuestas['wn'].astype(str).str.strip().str.upper()
             df_u = df_apuestas[df_apuestas['wn'] == u_wn]
         except:
             df_apuestas, df_u = pd.DataFrame(), pd.DataFrame()
 
-        # Comodín
+        # Lógica de Comodín
         v_com = 0.0
         if not df_u.empty:
             prev_c = df_u[df_u['partido_id'] == 999]
@@ -110,7 +101,6 @@ with menu[0]:
         cur_com = st.session_state.get('comodin_temp', v_com)
         st.markdown(f'<div class="info-comodin"><b>🃏 Comodín Ventas:</b> Tu apuesta actual es <b>{cur_com}%</b>.</div>', unsafe_allow_html=True)
 
-        st.markdown("### Selecciona el día:")
         dias = sorted(df_fixture['fecha'].unique(), key=lambda x: datetime.strptime(x, "%d/%m"))
         tabs_dias = st.tabs([f"📅 {d}" for d in dias])
 
@@ -137,7 +127,6 @@ with menu[0]:
                             st.number_input(f"V", 0, 20, v2, key=f"e2_{row['id']}")
 
             if st.form_submit_button("💾 GUARDAR TODOS LOS PRONÓSTICOS"):
-                # Generamos la lista de apuestas del usuario actual
                 nuevas = []
                 for _, row in df_fixture.iterrows():
                     nuevas.append({
@@ -147,16 +136,22 @@ with menu[0]:
                         "goles_equipo_2": st.session_state[f"e2_{row['id']}"],
                         "fecha_registro": datetime.now().strftime("%Y-%m-%d %H:%M")
                     })
-                # Agregamos el comodín
                 nuevas.append({"nombre": u_nom, "apellido": u_ape, "wn": u_wn, "sector": u_sec, "partido_id": 999, "goles_equipo_1": cur_com, "goles_equipo_2": 0, "fecha_registro": datetime.now().strftime("%Y-%m-%d %H:%M")})
                 
-                # Consolidamos: Quitamos lo viejo de este WN y agregamos lo nuevo
-                df_final = pd.concat([df_apuestas[df_apuestas['wn'] != u_wn] if not df_apuestas.empty else pd.DataFrame(), pd.DataFrame(nuevas)], ignore_index=True)
+                # Consolidar datos
+                df_limpio = df_apuestas[df_apuestas['wn'].astype(str).str.upper() != str(u_wn).upper()] if not df_apuestas.empty else pd.DataFrame()
+                df_final = pd.concat([df_limpio, pd.DataFrame(nuevas)], ignore_index=True)
                 
-                # Intentamos el guardado forzado
-                try:
-                    conn.create(worksheet="apuestas", data=df_final)
-                    st.success("¡Sincronizado con Drive!")
-                    st.rerun()
-                except:
-                    st.error("Error crítico de escritura. Por favor, vacía manualmente la pestaña 'apuestas' en Drive una vez para resetear el formato.")
+                # Guardado forzado creando la hoja desde cero para evitar el error UnsupportedOperation
+                conn.create(worksheet="apuestas", data=df_final)
+                st.success("¡Sincronizado con Drive!")
+                st.rerun()
+
+with menu[1]:
+    st.subheader("📊 Posiciones Reales")
+    try:
+        df_real = conn.read(worksheet="partidos", ttl=0)
+        # Lógica automática de tablas basada en tus columnas de Drive...
+        st.write("Datos detectados en 'partidos'.")
+    except:
+        st.info("Carga resultados reales en Drive para activar las tablas.")
