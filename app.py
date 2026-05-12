@@ -8,7 +8,7 @@ import os
 st.set_page_config(page_title="Penca Würth 2026", page_icon="⚽", layout="wide")
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# --- 2. FIXTURE COMPLETO (Basado en PDF Fixture 2026) ---
+# --- 2. FIXTURE COMPLETO (Extraído del PDF) ---
 def cargar_fixture():
     data = [
         # 11 de Junio
@@ -37,7 +37,7 @@ def cargar_fixture():
     ]
     return pd.DataFrame(data)
 
-# --- 3. ESTILO VISUAL BLINDADO ---
+# --- 3. ESTILO VISUAL ---
 st.markdown("""
     <style>
     [data-testid="stHeader"] {display: none;}
@@ -55,16 +55,20 @@ st.markdown("""
         font-weight: bold; font-size: 18px; margin-top: 20px;
         display: flex; align-items: center; justify-content: space-between;
     }
-    .partido-lleno { background-color: rgba(0, 0, 0, 0.03); border-radius: 4px; }
+    .info-comodin {
+        background-color: white; border-left: 5px solid #ED1C24;
+        padding: 15px; border-radius: 4px; margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 4. MODAL COMODÍN ---
+# --- 4. POP-UP COMODÍN ---
 @st.dialog("🃏 COMODÍN DE VENTAS JUNIO")
 def modal_comodin(v_actual):
     st.write("¿Qué % de cumplimiento alcanzará Würth Uruguay este mes?")
     val = st.number_input("Tu apuesta:", 0.0, 200.0, v_actual, step=0.1)
-    if st.button("Confirmar"):
+    if st.button("Confirmar Comodín"):
         st.session_state.comodin_temp = val
         st.rerun()
 
@@ -78,7 +82,7 @@ menu = st.tabs(["⚽ PRONÓSTICOS", "🏆 TABLAS", "🥇 RANKING"])
 with menu[0]:
     df_fixture = cargar_fixture()
     
-    st.subheader("👤 Registro")
+    st.subheader("👤 Registro de Colaborador")
     c1, c2, c3, c4 = st.columns([1,1,1,2])
     u_nom = c1.text_input("Nombre:").strip()
     u_ape = c2.text_input("Apellido:").strip()
@@ -87,14 +91,14 @@ with menu[0]:
 
     if u_nom and u_ape and u_wn:
         try:
+            # Leemos los datos actuales
             df_apuestas = conn.read(worksheet="apuestas", ttl=0)
-            # Solución al Error de la Imagen: Normalización estricta
             df_apuestas['wn'] = df_apuestas['wn'].astype(str).str.strip().str.upper()
             df_u = df_apuestas[df_apuestas['wn'] == u_wn]
         except:
             df_apuestas, df_u = pd.DataFrame(), pd.DataFrame()
 
-        # Comodín Pop-up
+        # Comodín
         v_com = 0.0
         if not df_u.empty:
             prev_c = df_u[df_u['partido_id'] == 999]
@@ -104,17 +108,17 @@ with menu[0]:
             modal_comodin(0.0)
         
         cur_com = st.session_state.get('comodin_temp', v_com)
-        st.info(f"🃏 **Comodín Ventas:** {cur_com}%")
+        st.markdown(f'<div class="info-comodin"><b>🃏 Comodín Ventas:</b> Tu apuesta actual es <b>{cur_com}%</b>.</div>', unsafe_allow_html=True)
 
+        st.markdown("### Selecciona el día:")
         dias = sorted(df_fixture['fecha'].unique(), key=lambda x: datetime.strptime(x, "%d/%m"))
         tabs_dias = st.tabs([f"📅 {d}" for d in dias])
 
-        with st.form("penca_final_form"):
+        with st.form("penca_form_v_final"):
             for i, dia in enumerate(dias):
                 with tabs_dias[i]:
                     partidos_dia = df_fixture[df_fixture['fecha'] == dia]
                     for _, row in partidos_dia.iterrows():
-                        # Identificador visual de guardado
                         v1, v2, lleno = 0, 0, False
                         if not df_u.empty:
                             prev = df_u[df_u['partido_id'] == row['id']]
@@ -133,6 +137,7 @@ with menu[0]:
                             st.number_input(f"V", 0, 20, v2, key=f"e2_{row['id']}")
 
             if st.form_submit_button("💾 GUARDAR TODOS LOS PRONÓSTICOS"):
+                # Generamos la lista de apuestas del usuario actual
                 nuevas = []
                 for _, row in df_fixture.iterrows():
                     nuevas.append({
@@ -142,11 +147,16 @@ with menu[0]:
                         "goles_equipo_2": st.session_state[f"e2_{row['id']}"],
                         "fecha_registro": datetime.now().strftime("%Y-%m-%d %H:%M")
                     })
+                # Agregamos el comodín
                 nuevas.append({"nombre": u_nom, "apellido": u_ape, "wn": u_wn, "sector": u_sec, "partido_id": 999, "goles_equipo_1": cur_com, "goles_equipo_2": 0, "fecha_registro": datetime.now().strftime("%Y-%m-%d %H:%M")})
                 
-                df_limpio = df_apuestas[df_apuestas['wn'].astype(str).str.upper() != str(u_wn).upper()] if not df_apuestas.empty else pd.DataFrame()
-                df_final = pd.concat([df_limpio, pd.DataFrame(nuevas)], ignore_index=True)
+                # Consolidamos: Quitamos lo viejo de este WN y agregamos lo nuevo
+                df_final = pd.concat([df_apuestas[df_apuestas['wn'] != u_wn] if not df_apuestas.empty else pd.DataFrame(), pd.DataFrame(nuevas)], ignore_index=True)
                 
-                conn.update(worksheet="apuestas", data=df_final)
-                st.success("¡Datos sincronizados con Drive!")
-                st.rerun()
+                # Intentamos el guardado forzado
+                try:
+                    conn.create(worksheet="apuestas", data=df_final)
+                    st.success("¡Sincronizado con Drive!")
+                    st.rerun()
+                except:
+                    st.error("Error crítico de escritura. Por favor, vacía manualmente la pestaña 'apuestas' en Drive una vez para resetear el formato.")
