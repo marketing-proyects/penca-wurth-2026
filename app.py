@@ -4,17 +4,16 @@ import sqlite3
 from datetime import datetime
 import os
 
-# --- 1. CONFIGURACIÓN ---
+# --- 1. CONFIGURACIÓN E INICIALIZACIÓN ---
 st.set_page_config(page_title="Penca Würth 2026", page_icon="⚽", layout="wide")
 
-# Inicializar estados de sesión para evitar errores de navegación
 if "admin_logged" not in st.session_state:
     st.session_state.admin_logged = False
 if "comodin_temp" not in st.session_state:
     st.session_state.comodin_temp = None
 
-# REEMPLAZA ESTE ENLACE CON TU URL "RAW" DE GITHUB
-URL_RESULTADOS_REALES = "https://raw.githubusercontent.com/TuUsuario/TuRepo/main/Maestro_Resultados_Penca_Wurth_2026_Final.xlsx"
+# URL DE DESCARGA DIRECTA DE GITHUB
+URL_RESULTADOS_REALES = "https://github.com/marketing-proyects/penca-wurth-2026/raw/5ea13ebda06c41af8cdf217dbe63d396b9ba4bb4/Maestro_Resultados_Penca_Wurth_2026_Final.xlsx"
 
 def init_db():
     conn = sqlite3.connect('penca.db')
@@ -27,7 +26,7 @@ def init_db():
 
 init_db()
 
-# --- 2. FIXTURE INTEGRAL (72 Partidos Grupos + 32 Eliminatorias) ---
+# --- 2. FIXTURE MAESTRO (72 Grupos + 32 Eliminatorias) ---
 def cargar_fixture():
     groups_data = {
         "A": ["Mexico", "Sudafrica", "Corea del Sur", "Rep. Checa"],
@@ -47,7 +46,6 @@ def cargar_fixture():
     matches = []
     match_id = 1
     for group_name, teams in groups_data.items():
-        # Fechas y Horarios Uruguay (UY)
         dates = ["11/06", "11/06", "17/06", "17/06", "22/06", "22/06"]
         if group_name in ["D", "E", "F"]: dates = ["14/06", "15/06", "19/06", "20/06", "24/06", "25/06"]
         if group_name in ["G", "H", "I"]: dates = ["16/06", "17/06", "21/06", "22/06", "26/06", "27/06"]
@@ -61,10 +59,8 @@ def cargar_fixture():
             })
             match_id += 1
     
-    # Añadir estructura para Eliminatorias (IDs 73-104)
     for i in range(73, 105):
-        matches.append({"id": i, "fase": "Eliminatorias", "grupo": "Finales", "e1": f"Equipo {i}A", "e2": f"Equipo {i}B", "fecha": "Julio", "hora": "20:00"})
-        
+        matches.append({"id": i, "fase": "Eliminatorias", "grupo": "Finales", "e1": f"Clasificado {i}A", "e2": f"Clasificado {i}B", "fecha": "Julio", "hora": "19:00"})
     return pd.DataFrame(matches)
 
 # --- 3. DIÁLOGO COMODÍN ---
@@ -72,12 +68,12 @@ def cargar_fixture():
 def modal_comodin(v_actual):
     st.markdown("##### ¿Qué porcentaje de cumplimiento alcanzará Würth Uruguay este mes?")
     val = st.number_input("Tu apuesta (%):", 0.0, 200.0, v_actual, step=0.1)
-    st.info("💡 Lógica: 50 pts al exacto | 10 pts al Top 10 más cercano.")
+    st.caption("50 pts al exacto | 10 pts al Top 10 más cercano.")
     if st.button("Confirmar Apuesta"):
         st.session_state.comodin_temp = val
         st.rerun()
 
-# --- 4. ESTILO VISUAL (Würth Style) ---
+# --- 4. ESTILO VISUAL ---
 st.markdown("""
     <style>
     [data-testid="stHeader"] {display: none;}
@@ -93,9 +89,6 @@ st.markdown("""
         color: white; padding: 12px; border-radius: 8px 8px 0px 0px;
         font-weight: bold; font-size: 15px; margin-top: 20px;
         display: flex; align-items: center; justify-content: space-between;
-    }
-    .info-comodin-card {
-        background: white; border-left: 5px solid #ED1C24; padding: 15px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);
     }
     .status-text { font-size: 12px; color: #28a745; font-weight: bold; }
     </style>
@@ -118,26 +111,25 @@ with menu[0]:
     u_ape = c2.text_input("Apellido:").strip()
     u_wn = c3.text_input("Código WN:").strip().upper()
     
+    # LISTA DE SECTORES CORREGIDA
     sectores = ["Finanzas", "Compras", "Créditos", "RRHH", "IT", "Dirección", "Logistica", "Televentas", "Tiendas", "e-Commerce", "Ventas", "Marketing", "Sales Operation", "Otro"]
     u_sec = c4.selectbox("Sector:", sectores, index=None, placeholder="Selecciona tu sector...")
 
     if all([u_nom, u_ape, u_wn, u_sec]):
-        # Leer apuestas actuales de la DB
         db_conn = sqlite3.connect('penca.db')
-        df_u = pd.read_sql(f"SELECT * FROM apuestas WHERE wn='{u_wn}'", db_conn)
+        # Cargamos específicamente qué IDs ya tiene este usuario guardados
+        df_u = pd.read_sql(f"SELECT partido_id, g1, g2 FROM apuestas WHERE wn='{u_wn}'", db_conn)
         db_conn.close()
 
-        # Comodín
         v_com_registrado = 0.0
-        if not df_u.empty:
-            p_com = df_u[df_u['partido_id'] == 999]
-            if not p_com.empty: v_com_registrado = float(p_com.iloc[0]['g1'])
+        if 999 in df_u['partido_id'].values:
+            v_com_registrado = float(df_u[df_u['partido_id'] == 999].iloc[0]['g1'])
         
         if st.session_state.comodin_temp is None and v_com_registrado == 0.0:
             modal_comodin(0.0)
         
         cur_com = st.session_state.comodin_temp if st.session_state.comodin_temp is not None else v_com_registrado
-        st.markdown(f'<div class="info-comodin-card"><b>🃏 Comodín Ventas Junio:</b> {cur_com}% (50 pts al exacto / 10 pts al Top 10)</div>', unsafe_allow_html=True)
+        st.markdown(f'<div style="background:white; border-left:5px solid #ED1C24; padding:10px; margin-bottom:10px;"><b>🃏 Comodín Ventas Junio:</b> {cur_com}%</div>', unsafe_allow_html=True)
 
         f_tabs = st.tabs(["Fase de Grupos", "Fase Eliminatoria"])
         
@@ -152,13 +144,11 @@ with menu[0]:
                         partidos_dia = df_g[df_g['fecha'] == dia]
                         ids_dia = partidos_dia['id'].tolist()
                         for _, row in partidos_dia.iterrows():
-                            # Lógica de Tick INDIVIDUAL real (basada en DB)
+                            # LÓGICA DE VALIDACIÓN INDIVIDUAL DE TICK ✅
                             v1, v2, guardado = 0, 0, False
-                            if not df_u.empty:
-                                prev = df_u[df_u['partido_id'] == row['id']]
-                                if not prev.empty:
-                                    v1, v2 = int(prev.iloc[0]['g1']), int(prev.iloc[0]['g2'])
-                                    guardado = True
+                            if row['id'] in df_u['partido_id'].values:
+                                reg = df_u[df_u['partido_id'] == row['id']].iloc[0]
+                                v1, v2, guardado = int(reg['g1']), int(reg['g2']), True
 
                             tick = " ✅" if guardado else ""
                             status = '<span class="status-text">Resultado ingresado</span>' if guardado else ""
@@ -167,32 +157,32 @@ with menu[0]:
                             cp, cg1, cg2 = st.columns([4, 1, 1])
                             cp.markdown(f"<div style='padding-top:20px;'><b>{row['e1']}</b> vs <b>{row['e2']}</b></div>", unsafe_allow_html=True)
                             st.session_state[f"g1_{row['id']}"] = cg1.number_input("L", 0, 20, v1, key=f"in_g1_{row['id']}")
-                            st.session_state[f"g2_{row['id']}"] = cg2.number_input("V", 0, 20, v2, key=f"in_g2_{row['id']}")
+                            st.session_state[f"g2_{row['id']}"] = cg2.number_input("V", 0, 20, v2, key=f"in_e2_{row['id']}")
 
                         if st.form_submit_button(f"💾 Guardar Día {dia}"):
                             db_conn = sqlite3.connect('penca.db')
                             c = db_conn.cursor()
                             ids_str = ",".join(map(str, ids_dia))
-                            # Borrar solo los de este día
+                            # Borramos solo lo que corresponde a este día específico
                             c.execute(f"DELETE FROM apuestas WHERE wn='{u_wn}' AND partido_id IN ({ids_str})")
                             for pid in ids_dia:
                                 g1 = st.session_state.get(f"in_g1_{pid}", 0)
                                 g2 = st.session_state.get(f"in_g2_{pid}", 0)
                                 c.execute("INSERT INTO apuestas VALUES (?,?,?,?,?,?,?,?)", (u_wn, u_nom, u_ape, u_sec, pid, g1, g2, datetime.now().strftime("%Y-%m-%d %H:%M")))
-                            # Actualizar Comodín
+                            # Sincronizamos el comodín también al guardar el día
                             c.execute(f"DELETE FROM apuestas WHERE wn='{u_wn}' AND partido_id=999")
                             c.execute("INSERT INTO apuestas VALUES (?,?,?,?,?,?,?,?)", (u_wn, u_nom, u_ape, u_sec, 999, cur_com, 0, datetime.now().strftime("%Y-%m-%d %H:%M")))
                             db_conn.commit()
                             db_conn.close()
-                            st.success(f"Día {dia} guardado.")
+                            st.success(f"Día {dia} guardado correctamente.")
                             st.rerun()
 
         with f_tabs[1]:
-            st.info("⚽ Cruces eliminatorios disponibles al finalizar la fase de grupos.")
+            st.info("⚽ Los cruces eliminatorios estarán disponibles al terminar la fase de grupos.")
 
 # --- TAB 2: TABLAS ---
 with menu[1]:
-    st.subheader("📊 Grupos Oficiales Mundial 2026")
+    st.subheader("📊 Composición de Grupos")
     df_fix_all = cargar_fixture()
     grupos_lista = sorted(df_fix_all[df_fix_all['fase']=='Grupos']['grupo'].unique())
     cols = st.columns(3)
@@ -207,26 +197,28 @@ with menu[1]:
 with menu[3]:
     st.subheader("🔒 Panel Administrativo")
     if not st.session_state.admin_logged:
-        with st.form("admin_login_form"):
-            pass_input = st.text_input("Contraseña:", type="password")
+        with st.form("admin_login_box"):
+            p_in = st.text_input("Contraseña:", type="password")
             if st.form_submit_button("Acceder"):
-                if pass_input == "market1NG?":
+                if p_in == "market1NG?":
                     st.session_state.admin_logged = True
                     st.rerun()
-                else: st.error("Clave incorrecta")
+                else: st.error("Contraseña incorrecta.")
     else:
         if st.button("Cerrar Sesión Admin"):
             st.session_state.admin_logged = False
             st.rerun()
         
-        db_conn = sqlite3.connect('penca.db')
-        df_admin = pd.read_sql("SELECT * FROM apuestas", db_conn)
-        db_conn.close()
-        
-        if not df_admin.empty:
-            st.success("Conexión con DB establecida.")
-            csv = df_admin.to_csv(index=False).encode('utf-8')
-            st.download_button("📥 Descargar Base de Datos (CSV)", csv, "penca_wurth.csv", "text/csv")
-            st.dataframe(df_admin)
-        else:
-            st.info("Aún no hay apuestas en la base de datos.")
+        try:
+            db_conn = sqlite3.connect('penca.db')
+            df_admin = pd.read_sql("SELECT * FROM apuestas", db_conn)
+            db_conn.close()
+            if not df_admin.empty:
+                st.success("Base de datos conectada con éxito.")
+                csv = df_admin.to_csv(index=False).encode('utf-8')
+                st.download_button("📥 Descargar CSV", csv, "penca_export.csv", "text/csv")
+                st.dataframe(df_admin)
+            else:
+                st.info("La base de datos está vacía por ahora.")
+        except:
+            st.error("Error: Todavía no hay apuestas registradas para crear la base de datos.")
