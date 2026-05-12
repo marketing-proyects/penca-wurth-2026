@@ -14,7 +14,7 @@ st.set_page_config(
 # Conexión a Google Sheets
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# --- 2. CSS: ESTILO CEREBRO / GRADIENTE / BLINDAJE ---
+# --- 2. CSS: ESTILO CEREBRO CON GRADIENTE DIRECCIONAL ---
 st.markdown("""
     <style>
     #MainMenu {visibility: hidden;}
@@ -35,6 +35,7 @@ st.markdown("""
         background-attachment: fixed;
     }
 
+    /* Blindaje de Logo Técnica CEREBRO (Evita redondeo de imagen) */
     [data-testid="stImage"] img { border-radius: 0px !important; }
     .logo-box-cerebro {
         background-color: white !important;
@@ -55,20 +56,18 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. FUNCIÓN DE DATOS CON MANEJO DE ERRORES CRÍTICOS ---
+# --- 3. FUNCIONES DE DATOS ---
 def obtener_datos(pestana):
     try:
-        # ttl=0 forzado para evitar el error de caché de la imagen
+        # ttl=0 para forzar lectura real del Excel
         df = conn.read(worksheet=pestana, ttl=0)
-        if df is not None and not df.empty:
-            # Limpiar nombres de columnas
+        if df is not None:
+            # Limpiar nombres de columnas: sin espacios y en minúsculas
             df.columns = [str(c).strip().lower() for c in df.columns]
-            # Eliminar filas/columnas fantasma
-            df = df.dropna(how='all', axis=0).dropna(how='all', axis=1)
-            return df
-        return pd.DataFrame()
-    except Exception as e:
-        # Si falla por "EmptyData", devolvemos DF vacío sin romper la app
+            # Eliminar filas vacías
+            df = df.dropna(how='all')
+        return df
+    except Exception:
         return pd.DataFrame()
 
 # --- 4. CABECERA ---
@@ -88,10 +87,10 @@ with tab1:
     st.markdown("<br>", unsafe_allow_html=True)
     df_partidos = obtener_datos("partidos")
 
-    # Columnas mínimas para operar
-    cols_necesarias = ['id', 'local', 'visitante']
+    # Columnas críticas para renderizar el fixture
+    cols_ok = ['id', 'local', 'visitante']
     
-    if not df_partidos.empty and all(c in df_partidos.columns for c in cols_necesarias):
+    if not df_partidos.empty and all(c in df_partidos.columns for c in cols_ok):
         with st.form("form_penca"):
             usuario = st.text_input("Participante:", placeholder="Tu nombre")
             st.divider()
@@ -101,7 +100,9 @@ with tab1:
                 col1, col2 = st.columns([3, 2])
                 with col1:
                     st.markdown(f"**{row['local']} vs {row['visitante']}**")
-                    st.caption(f"{row.get('fecha', '-')} | {row.get('hora_uy', '-')} hs")
+                    fecha = row.get('fecha', '-')
+                    hora = row.get('hora_uy', '-')
+                    st.caption(f"{fecha} | {hora} hs")
                 
                 with col2:
                     c1, c2 = st.columns(2)
@@ -128,17 +129,17 @@ with tab1:
                     except:
                         st.error("Error al guardar. Verifica que exista la pestaña 'apuestas'.")
                 else:
-                    st.error("⚠️ El nombre es obligatorio.")
+                    st.error("⚠️ Por favor ingresa tu nombre.")
     else:
-        st.warning("⚠️ No se detectan datos en 'partidos'.")
+        st.warning("⚠️ No se detectan datos válidos en 'partidos'.")
         if not df_partidos.empty:
             st.write("Columnas detectadas:", list(df_partidos.columns))
-        st.info("Asegúrate de que los encabezados estén en la FILA 1 de la hoja 'partidos'.")
+        st.info("Asegúrate de que la Fila 1 tenga: id, fecha, hora_uy, local, visitante.")
 
 with tab2:
     st.header("📊 Desafío Ventas")
-    st.write("Seguimiento de objetivos comerciales.")
+    st.info("Módulo de seguimiento comercial.")
 
 with tab3:
     st.header("🥇 Ranking")
-    st.write("Tabla de posiciones de la Penca.")
+    st.info("Tabla de posiciones oficial.")
