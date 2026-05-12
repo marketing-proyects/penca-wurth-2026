@@ -8,18 +8,21 @@ import os
 st.set_page_config(page_title="Penca Würth 2026", page_icon="⚽", layout="wide")
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# --- 2. FIXTURE INTERNO (Fase de Grupos) ---
+# --- 2. FIXTURE REAL FASE DE GRUPOS ---
 def cargar_fixture():
     data = [
-        {"id": 1, "grupo": "GRUPO A", "e1": "México", "e2": "EE.UU.", "fecha": "11/06", "hora": "17:00"},
-        {"id": 2, "grupo": "GRUPO A", "e1": "Uruguay", "e2": "Corea del Sur", "fecha": "12/06", "hora": "14:00"},
-        {"id": 3, "grupo": "GRUPO B", "e1": "Argentina", "e2": "Arabia Saudita", "fecha": "12/06", "hora": "20:00"},
-        {"id": 4, "grupo": "GRUPO B", "e1": "Francia", "e2": "Australia", "fecha": "13/06", "hora": "15:00"},
-        # Puedes seguir completando la lista aquí...
+        {"id": 1, "grupo": "GRUPO A", "e1": "México", "e2": "Sudáfrica", "fecha": "11/06", "hora": "17:00"},
+        {"id": 2, "grupo": "GRUPO A", "e1": "Uruguay", "e2": "Francia", "fecha": "11/06", "hora": "21:00"},
+        {"id": 3, "grupo": "GRUPO B", "e1": "Argentina", "e2": "Nigeria", "fecha": "12/06", "hora": "11:00"},
+        {"id": 4, "grupo": "GRUPO B", "e1": "Corea del Sur", "e2": "Grecia", "fecha": "12/06", "hora": "08:30"},
+        {"id": 5, "grupo": "GRUPO C", "e1": "Inglaterra", "e2": "EE.UU.", "fecha": "12/06", "hora": "15:30"},
+        {"id": 6, "grupo": "GRUPO D", "e1": "Alemania", "e2": "Australia", "fecha": "13/06", "hora": "15:30"},
+        {"id": 7, "grupo": "GRUPO A", "e1": "Uruguay", "e2": "Sudáfrica", "fecha": "16/06", "hora": "15:30"},
+        # Puedes seguir agregando el resto de los partidos aquí
     ]
     return pd.DataFrame(data)
 
-# --- 3. ESTILO VISUAL (CEREBRO + GRADIENTE) ---
+# --- 3. ESTILO VISUAL ---
 st.markdown("""
     <style>
     [data-testid="stHeader"] {display: none;}
@@ -35,7 +38,10 @@ st.markdown("""
         background-color: #ED1C24; color: white; padding: 12px; border-radius: 4px; 
         margin-top: 25px; font-weight: bold; font-size: 18px;
     }
-    .main-title { color: #ED1C24; font-size: 42px; font-family: 'Arial Black'; margin-bottom: 30px; letter-spacing: -1px; }
+    .comodin-card {
+        background-color: #f8f9fa; border: 2px dashed #ED1C24; padding: 20px;
+        border-radius: 10px; margin-top: 30px; text-align: center;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -43,19 +49,17 @@ st.markdown("""
 st.markdown('<div class="logo-box">', unsafe_allow_html=True)
 st.image("logo_wurth.jpg" if os.path.exists("logo_wurth.jpg") else "https://upload.wikimedia.org/wikipedia/commons/1/1e/Wuerth_Logo_2024.svg", width=200)
 st.markdown('</div>', unsafe_allow_html=True)
-st.markdown("<h1 class='main-title'>PENCA DIGITAL WÜRTH 2026</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='color: #ED1C24; font-size: 42px; margin-bottom: 30px;'>PENCA DIGITAL WÜRTH 2026</h1>", unsafe_allow_html=True)
 
 tab1, tab2, tab3 = st.tabs(["⚽ PRONÓSTICOS", "📊 DESAFÍO VENTAS", "🥇 RANKING"])
 
-# --- TAB 1: PRONÓSTICOS ---
 with tab1:
     df_fixture = cargar_fixture()
     
-    # Inicializar estado de navegación si no existe
     if 'paso_registro' not in st.session_state:
         st.session_state.paso_registro = False
 
-    # PASO 1: Identificación
+    # PASO 1: Identificación con Áreas Reales
     st.subheader("👤 Registro del Colaborador")
     col1, col2 = st.columns(2)
     u_nombre = col1.text_input("Nombre:").strip()
@@ -63,21 +67,19 @@ with tab1:
     
     col3, col4 = st.columns(2)
     u_email = col3.text_input("Email:")
-    u_sector = col4.selectbox("Sector:", ["Ventas", "Logística", "Administración", "IT", "Marketing", "Depósito", "Directorio"])
+    u_sector = col4.selectbox("Sector:", ["RRHH", "Finanzas", "Créditos", "Compras", "IT", "Dirección", "CEO", "Logística", "Tiendas", "Telentas", "e-Commerce", "Ventas", "Otra"])
 
     if st.button("INGRESAR AL FIXTURE"):
         if u_nombre and u_apellido and "@" in u_email:
             st.session_state.paso_registro = True
             st.rerun()
         else:
-            st.error("Por favor, completa Nombre, Apellido e Email válido para continuar.")
+            st.error("Por favor, completa los campos correctamente.")
 
-    # PASO 2: Mostrar Fixture si ya se identificó
+    # PASO 2: Fixture + Comodín
     if st.session_state.paso_registro:
         st.divider()
-        st.success(f"Bienvenido {u_nombre}. Puedes completar tus pronósticos a continuación.")
         
-        # Cargar apuestas previas para permitir "Guardado Parcial"
         try:
             df_todas = conn.read(worksheet="apuestas", ttl=0)
             df_usu = df_todas[(df_todas['nombre'].str.lower() == u_nombre.lower()) & 
@@ -88,30 +90,45 @@ with tab1:
 
         with st.form("penca_grupos"):
             grupos = df_fixture['grupo'].unique()
-            
             for g in grupos:
                 st.markdown(f'<div class="grupo-header">{g}</div>', unsafe_allow_html=True)
                 partidos_grupo = df_fixture[df_fixture['grupo'] == g]
                 
                 for _, row in partidos_grupo.iterrows():
-                    # Valores por defecto (si ya existen en el drive)
                     v1, v2 = 0, 0
                     if not df_usu.empty:
                         prev = df_usu[df_usu['partido_id'] == row['id']]
                         if not prev.empty:
-                            v1 = int(prev.iloc[0]['goles_equipo_1'])
-                            v2 = int(prev.iloc[0]['goles_equipo_2'])
+                            v1, v2 = int(prev.iloc[0]['goles_equipo_1']), int(prev.iloc[0]['goles_equipo_2'])
 
                     col_p, col_g1, col_g2 = st.columns([4, 1, 1])
                     with col_p:
                         st.markdown(f"<div style='padding-top:15px;'><b>{row['e1']} vs {row['e2']}</b><br><small>{row['fecha']} - {row['hora']} hs</small></div>", unsafe_allow_html=True)
                     with col_g1:
-                        res1 = st.number_input(f"Goles {row['e1']}", 0, 20, v1, key=f"e1_{row['id']}")
+                        st.number_input(f"Goles {row['e1']}", 0, 20, v1, key=f"e1_{row['id']}")
                     with col_g2:
-                        res2 = st.number_input(f"Goles {row['e2']}", 0, 20, v2, key=f"e2_{row['id']}")
+                        st.number_input(f"Goles {row['e2']}", 0, 20, v2, key=f"e2_{row['id']}")
             
-            if st.form_submit_button("💾 GUARDAR AVANCES"):
+            # --- SECCIÓN COMODÍN DE VENTAS ---
+            st.markdown('<div class="comodin-card">', unsafe_allow_html=True)
+            st.subheader("🃏 CARTA COMODÍN")
+            st.write("**Apostá por el % del cumplimiento de la empresa del mes de Junio**")
+            
+            # Recuperar valor previo del comodín si existe
+            v_comodin = 0.0
+            if not df_usu.empty:
+                # El comodín lo guardamos con un ID especial, por ejemplo 999
+                prev_c = df_usu[df_usu['partido_id'] == 999]
+                if not prev_c.empty:
+                    v_comodin = float(prev_c.iloc[0]['goles_equipo_1']) # Usamos esta columna para el %
+
+            u_comodin = st.number_input("Tu apuesta de cumplimiento (%):", 0.0, 200.0, v_comodin, step=0.1, key="comodin_junio")
+            st.caption("Exacto: 50 pts | Top 10 más próximos: 10 pts")
+            st.markdown('</div>', unsafe_allow_html=True)
+
+            if st.form_submit_button("💾 GUARDAR PRONÓSTICOS Y COMODÍN"):
                 nuevas = []
+                # Guardar partidos
                 for _, row in df_fixture.iterrows():
                     nuevas.append({
                         "nombre": u_nombre, "apellido": u_apellido, "email": u_email, "sector": u_sector,
@@ -120,31 +137,30 @@ with tab1:
                         "goles_equipo_2": st.session_state[f"e2_{row['id']}"],
                         "fecha_registro": datetime.now().strftime("%Y-%m-%d %H:%M")
                     })
+                # Guardar comodín (ID 999)
+                nuevas.append({
+                    "nombre": u_nombre, "apellido": u_apellido, "email": u_email, "sector": u_sector,
+                    "partido_id": 999, 
+                    "goles_equipo_1": u_comodin,
+                    "goles_equipo_2": 0,
+                    "fecha_registro": datetime.now().strftime("%Y-%m-%d %H:%M")
+                })
                 
                 df_envio = pd.DataFrame(nuevas)
-                # Limpiar registros anteriores del mismo usuario en el DataFrame antes de subir
                 if not df_todas.empty:
-                    df_limpio = df_todas[~((df_todas['nombre'].str.lower() == u_nombre.lower()) & 
-                                          (df_todas['apellido'].str.lower() == u_apellido.lower()))]
+                    df_limpio = df_todas[~((df_todas['nombre'].str.lower() == u_nombre.lower()) & (df_todas['apellido'].str.lower() == u_apellido.lower()))]
                     df_final = pd.concat([df_limpio, df_envio], ignore_index=True)
                 else:
                     df_final = df_envio
                 
                 conn.update(worksheet="apuestas", data=df_final)
-                st.success("Tus pronósticos han sido guardados. Puedes volver más tarde si deseas cambiarlos.")
+                st.success("¡Pronósticos y Comodín guardados!")
                 st.balloons()
 
-# --- TAB 2: VENTAS ---
 with tab2:
     st.header("📊 Desafío de Ventas")
-    st.write("Suma puntos extra por cumplimiento de objetivos de empresa.")
-    try:
-        df_v = conn.read(worksheet="ventas", ttl=0)
-        st.dataframe(df_v, use_container_width=True)
-    except:
-        st.info("Planilla de ventas en proceso de actualización.")
+    st.write("Aquí se mostrará el avance real del mes para comparar con tu comodín.")
 
-# --- TAB 3: RANKING ---
 with tab3:
-    st.header("🥇 Tabla de Posiciones")
-    st.write("Cargando puntajes oficiales...")
+    st.header("🥇 Ranking")
+    st.write("Puntajes de fútbol + Puntos de Carta Comodín.")
