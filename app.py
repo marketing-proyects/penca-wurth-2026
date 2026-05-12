@@ -8,7 +8,7 @@ import os
 st.set_page_config(page_title="Penca Würth 2026", page_icon="⚽", layout="wide")
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# --- 2. FIXTURE COMPLETO (Recuperado de tu PDF) ---
+# --- 2. FIXTURE COMPLETO (Recuperado del PDF) ---
 def cargar_fixture():
     data = [
         # GRUPO A
@@ -30,9 +30,10 @@ def cargar_fixture():
         {"id": 10, "grupo": "F", "e1": "España 🇪🇸", "e2": "Cabo Verde 🇨🇻", "fecha": "15/06", "hora": "19:00"},
         {"id": 30, "grupo": "F", "e1": "Uruguay 🇺🇾", "e2": "España 🇪🇸", "fecha": "20/06", "hora": "21:00"},
     ]
+    # Puedes seguir agregando el resto de partidos siguiendo esta estructura
     return pd.DataFrame(data)
 
-# --- 3. ESTILO VISUAL (Técnica CEREBRO) ---
+# --- 3. ESTILO VISUAL (Logo Blindado) ---
 st.markdown("""
     <style>
     [data-testid="stHeader"] {display: none;}
@@ -72,12 +73,12 @@ st.markdown('<div class="logo-box">', unsafe_allow_html=True)
 st.image("logo_wurth.jpg" if os.path.exists("logo_wurth.jpg") else "https://upload.wikimedia.org/wikipedia/commons/1/1e/Wuerth_Logo_2024.svg", width=180)
 st.markdown('</div>', unsafe_allow_html=True)
 
-tab_menu = st.tabs(["⚽ PRONÓSTICOS", "🏆 TABLAS", "🥇 RANKING"])
+menu = st.tabs(["⚽ PRONÓSTICOS", "🏆 TABLAS", "🥇 RANKING"])
 
-with tab_menu[0]:
+with menu[0]:
     df_fixture = cargar_fixture()
     
-    st.subheader("👤 Registro del Colaborador")
+    st.subheader("👤 Registro de Colaborador")
     c1, c2, c3, c4 = st.columns([1,1,1,2])
     u_nom = c1.text_input("Nombre:").strip()
     u_ape = c2.text_input("Apellido:").strip()
@@ -86,14 +87,14 @@ with tab_menu[0]:
 
     if u_nom and u_ape and u_wn:
         try:
-            # Lectura normalizada
+            # Lectura normalizada para evitar errores de tipo
             df_apuestas = conn.read(worksheet="apuestas", ttl=0)
             df_apuestas['wn'] = df_apuestas['wn'].astype(str).str.strip().str.upper()
             df_u = df_apuestas[df_apuestas['wn'] == u_wn]
         except:
             df_apuestas, df_u = pd.DataFrame(), pd.DataFrame()
 
-        # Comodín Pop-up
+        # Lógica de Comodín
         v_com = 0.0
         if not df_u.empty:
             prev_c = df_u[df_u['partido_id'] == 999]
@@ -103,7 +104,7 @@ with tab_menu[0]:
             modal_comodin(0.0)
         
         cur_com = st.session_state.get('comodin_temp', v_com)
-        st.markdown(f'<div class="info-comodin"><b>🃏 Comodín Ventas:</b> Tu apuesta es <b>{cur_com}%</b>.</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="info-comodin"><b>🃏 Comodín Ventas:</b> Tu apuesta actual es <b>{cur_com}%</b>.</div>', unsafe_allow_html=True)
 
         st.markdown("### Pronósticos por Fecha:")
         dias = sorted(df_fixture['fecha'].unique(), key=lambda x: datetime.strptime(x, "%d/%m"))
@@ -144,11 +145,12 @@ with tab_menu[0]:
                     })
                 nuevas.append({"nombre": u_nom, "apellido": u_ape, "wn": u_wn, "sector": u_sec, "partido_id": 999, "goles_equipo_1": cur_com, "goles_equipo_2": 0, "fecha_registro": datetime.now().strftime("%Y-%m-%d %H:%M")})
                 
-                # Consolidación que evita el error UnsupportedOperation
+                # Consolidación final para evitar duplicados
                 df_limpio = df_apuestas[df_apuestas['wn'].astype(str).str.upper() != str(u_wn).upper()] if not df_apuestas.empty else pd.DataFrame()
                 df_final = pd.concat([df_limpio, pd.DataFrame(nuevas)], ignore_index=True)
                 
-                # REGLA DE ORO: Si falla el update, forzamos un reseteo de la hoja
+                # LA SOLUCIÓN AL ERROR:
+                # Si falla el guardado por el error UnsupportedOperation, intentamos una escritura limpia.
                 try:
                     conn.update(worksheet="apuestas", data=df_final)
                     st.success("¡Datos sincronizados con Drive!")
