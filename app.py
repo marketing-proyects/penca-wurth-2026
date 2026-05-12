@@ -12,7 +12,7 @@ if "admin_logged" not in st.session_state:
 if "comodin_temp" not in st.session_state:
     st.session_state.comodin_temp = None
 
-# URL DE DESCARGA DIRECTA DE GITHUB
+# URL DE DESCARGA DIRECTA DE GITHUB (Sincronizado con tu Excel)
 URL_RESULTADOS_REALES = "https://github.com/marketing-proyects/penca-wurth-2026/raw/5ea13ebda06c41af8cdf217dbe63d396b9ba4bb4/Maestro_Resultados_Penca_Wurth_2026_Final.xlsx"
 
 def init_db():
@@ -59,8 +59,15 @@ def cargar_fixture():
             })
             match_id += 1
     
-    for i in range(73, 105):
-        matches.append({"id": i, "fase": "Eliminatorias", "grupo": "Finales", "e1": f"Clasificado {i}A", "e2": f"Clasificado {i}B", "fecha": "Julio", "hora": "19:00"})
+    # Fases de Eliminación (IDs 73-104)
+    fases = [("Ronda de 32", 16), ("Octavos", 8), ("Cuartos", 4), ("Semis", 2), ("Tercer Puesto", 1), ("Gran Final", 1)]
+    for f_nom, cant in fases:
+        for _ in range(cant):
+            matches.append({
+                "id": match_id, "fase": f_nom, "grupo": "Eliminatoria", 
+                "e1": f"Clasificado {match_id}A", "e2": f"Clasificado {match_id}B", "fecha": "Julio", "hora": "20:00"
+            })
+            match_id += 1
     return pd.DataFrame(matches)
 
 # --- 3. DIÁLOGO COMODÍN ---
@@ -68,7 +75,7 @@ def cargar_fixture():
 def modal_comodin(v_actual):
     st.markdown("##### ¿Qué porcentaje de cumplimiento alcanzará Würth Uruguay este mes?")
     val = st.number_input("Tu apuesta (%):", 0.0, 200.0, v_actual, step=0.1)
-    st.info("💡 **Lógica de Puntos Comodín:**\n- 50 pts: Acierto exacto.\n- 10 pts: Top 10 más cercanos.")
+    st.info("💡 **Lógica de Puntos:**\n- **50 pts:** Acierto exacto.\n- **10 pts:** Dentro del Top 10 de aciertos más cercanos.")
     if st.button("Confirmar Apuesta"):
         st.session_state.comodin_temp = val
         st.rerun()
@@ -90,9 +97,16 @@ st.markdown("""
         font-weight: bold; font-size: 15px; margin-top: 20px;
         display: flex; align-items: center; justify-content: space-between;
     }
-    .puntos-card {
-        background: #f8f9fa; border-left: 5px solid #ED1C24; padding: 15px; 
-        margin: 10px 0; border-radius: 0 5px 5px 0; font-size: 14px;
+    .info-comodin-card {
+        background: white; border-left: 5px solid #ED1C24; padding: 15px; 
+        margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); border-radius: 0 4px 4px 0;
+    }
+    .puntos-reglas-card {
+        background: #f8f9fa; border: 1px solid #ddd; padding: 15px; border-radius: 8px; margin-bottom: 20px;
+    }
+    .grupo-tabla-card {
+        background: white; border: 1px solid #ddd; border-radius: 8px;
+        padding: 15px; margin-bottom: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);
     }
     .status-text { font-size: 12px; color: #28a745; font-weight: bold; }
     </style>
@@ -110,14 +124,13 @@ menu = st.tabs(["⚽ PRONÓSTICOS", "🏆 TABLAS", "🥇 RANKING", "🔒 ADMIN"]
 with menu[0]:
     df_fixture = cargar_fixture()
     
-    # EXPLICACIÓN DE PUNTOS RESTAURADA
     st.markdown('''
-        <div class="puntos-card">
+        <div class="puntos-reglas-card">
             <b>🏆 REGLAS DE PUNTUACIÓN:</b><br>
             • <b>3 Puntos:</b> Acierto del resultado exacto.<br>
-            • <b>1 Punto:</b> Acierto de Ganador o Empate (pero no resultado exacto).
+            • <b>1 Punto:</b> Acierto de Ganador o Empate.
         </div>''', unsafe_allow_html=True)
-    
+
     st.subheader("👤 Registro de Colaborador")
     c1, c2, c3, c4 = st.columns([1,1,1,2])
     u_nom = c1.text_input("Nombre:").strip()
@@ -131,6 +144,7 @@ with menu[0]:
         df_u = pd.read_sql(f"SELECT partido_id, g1, g2 FROM apuestas WHERE wn='{u_wn}'", db_conn)
         db_conn.close()
 
+        # Comodín
         v_com_registrado = 0.0
         if 999 in df_u['partido_id'].values:
             v_com_registrado = float(df_u[df_u['partido_id'] == 999].iloc[0]['g1'])
@@ -139,7 +153,12 @@ with menu[0]:
             modal_comodin(0.0)
         
         cur_com = st.session_state.comodin_temp if st.session_state.comodin_temp is not None else v_com_registrado
-        st.markdown(f'<div style="background:white; border-left:5px solid #ED1C24; padding:10px; margin-bottom:10px;"><b>🃏 Comodín Ventas Junio:</b> {cur_com}%</div>', unsafe_allow_html=True)
+        
+        st.markdown(f'''
+            <div class="info-comodin-card">
+                <b>🃏 Comodín Ventas Junio:</b> Tu pronóstico es del <b>{cur_com}%</b>.<br>
+                <small style="color: #666;">Lógica: 50 pts al exacto | 10 pts al Top 10 más cercano.</small>
+            </div>''', unsafe_allow_html=True)
 
         f_tabs = st.tabs(["Fase de Grupos", "Fase Eliminatoria"])
         
@@ -182,14 +201,42 @@ with menu[0]:
                             st.success(f"Día {dia} guardado correctamente.")
                             st.rerun()
 
-# --- TAB 4: ADMIN (CON SUGERENCIA DE SEGURIDAD) ---
+        with f_tabs[1]:
+            st.info("⚽ **Fase Eliminatoria:** Los pronósticos para estas fases se habilitarán una vez finalizada la fase de grupos y definidos los clasificados reales.")
+            df_elim = df_fixture[df_fixture['fase'] != "Grupos"]
+            for f_name in df_elim['fase'].unique():
+                st.write(f"**{f_name}**")
+                p_fase = df_elim[df_elim['fase'] == f_name]
+                for _, r in p_fase.iterrows():
+                    st.text(f"ID {r['id']}: {r['e1']} vs {r['e2']} ({r['fecha']})")
+
+# --- TAB 2: TABLAS (RESTAURADA) ---
+with menu[1]:
+    st.subheader("📊 Composición de Grupos")
+    df_fix_all = cargar_fixture()
+    grupos_lista = sorted(df_fix_all[df_fix_all['fase']=='Grupos']['grupo'].unique())
+    cols = st.columns(3)
+    for idx, g_name in enumerate(grupos_lista):
+        with cols[idx % 3]:
+            st.markdown(f'''
+                <div class="grupo-tabla-card">
+                    <div style="background:#ED1C24; color:white; padding:8px; border-radius:4px; font-weight:bold; margin-bottom:10px; text-align:center;">
+                        GRUPO {g_name}
+                    </div>''', unsafe_allow_html=True)
+            # Obtenemos los integrantes del grupo
+            equipos_g = pd.concat([df_fix_all[df_fix_all['grupo']==g_name]['e1'], 
+                                   df_fix_all[df_fix_all['grupo']==g_name]['e2']]).unique()
+            for eq in equipos_g:
+                st.markdown(f"⚽ {eq}")
+            st.markdown('</div>', unsafe_allow_html=True)
+
+# --- TAB 4: ADMIN ---
 with menu[3]:
     st.subheader("🔒 Panel Administrativo")
     if not st.session_state.admin_logged:
         with st.form("admin_login_box"):
             p_in = st.text_input("Contraseña:", type="password")
             if st.form_submit_button("Acceder"):
-                # AHORA BUSCA LA CLAVE EN LOS SECRETS DE STREAMLIT
                 try:
                     if p_in == st.secrets["admin_password"]:
                         st.session_state.admin_logged = True
@@ -209,9 +256,9 @@ with menu[3]:
             if not df_admin.empty:
                 st.success("Base de datos conectada.")
                 csv = df_admin.to_csv(index=False).encode('utf-8')
-                st.download_button("📥 Descargar CSV", csv, "penca_export.csv", "text/csv")
+                st.download_button("📥 Descargar Base de Datos (CSV)", csv, "penca_export.csv", "text/csv")
                 st.dataframe(df_admin)
             else:
-                st.info("La base de datos está vacía.")
+                st.info("La base de datos está vacía por ahora.")
         except:
-            st.error("Error al cargar los datos.")
+            st.error("Error al acceder a la base de datos.")
