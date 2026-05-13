@@ -12,7 +12,7 @@ st.set_page_config(page_title="Penca Würth 2026", page_icon="⚽", layout="wide
 if "admin_logged" not in st.session_state: st.session_state.admin_logged = False
 if "comodin_temp" not in st.session_state: st.session_state.comodin_temp = None
 
-# URL RAW DE GITHUB (Asegúrate que sea la dirección de descarga directa)
+# URL DE DESCARGA DIRECTA DE TU EXCEL EN GITHUB
 URL_RESULTADOS_REALES = "https://github.com/marketing-proyects/penca-wurth-2026/raw/5ea13ebda06c41af8cdf217dbe63d396b9ba4bb4/Maestro_Resultados_Penca_Wurth_2026_Final.xlsx"
 
 def init_db():
@@ -26,7 +26,7 @@ def init_db():
 
 init_db()
 
-# --- 2. FIXTURE COMPLETO ---
+# --- 2. FIXTURE INTEGRAL (104 Partidos) ---
 def cargar_fixture():
     groups = {
         "A": ["Mexico", "Sudafrica", "Corea del Sur", "Rep. Checa"], "B": ["Canada", "Bosnia", "Qatar", "Suiza"],
@@ -47,7 +47,7 @@ def cargar_fixture():
         for i, p in enumerate(pairs):
             matches.append({"id": mid, "fase": "Grupos", "grupo": g_name, "e1": p[0], "e2": p[1], "fecha": dates[i], "hora": "18:00" if i%2==0 else "22:00"})
             mid += 1
-    # Eliminatorias (IDs 73 al 104)
+    # Fases finales (IDs 73 al 104)
     f_e = [("Ronda de 32", 16), ("Octavos", 8), ("Cuartos", 4), ("Semis", 2), ("Tercer Puesto", 1), ("Final", 1)]
     for f_nom, cant in f_e:
         for _ in range(cant):
@@ -55,7 +55,7 @@ def cargar_fixture():
             mid += 1
     return pd.DataFrame(matches)
 
-# --- 3. ESTILOS ---
+# --- 3. DISEÑO Y ESTILOS ---
 st.markdown("""
     <style>
     [data-testid="stHeader"] {display: none;}
@@ -84,13 +84,13 @@ with menu[0]:
     if all([u_nom, u_ape, u_wn, u_sec]):
         db = sqlite3.connect('penca.db'); df_u = pd.read_sql(f"SELECT * FROM apuestas WHERE wn='{u_wn}'", db); db.close()
         
-        # Comodín
+        # Lógica Comodín
         v_com = float(df_u[df_u['partido_id']==999].iloc[0]['g1']) if 999 in df_u['partido_id'].values else 0.0
         if st.session_state.comodin_temp is None and v_com == 0.0:
             @st.dialog("🃏 COMODÍN DE VENTAS JUNIO")
             def modal_com():
-                st.write("¿Qué porcentaje de cumplimiento tendrá Würth Uruguay?")
-                val = st.number_input("%:", 0.0, 200.0, step=0.1)
+                st.write("¿Qué cumplimiento (%) tendrá Würth Uruguay en Junio?")
+                val = st.number_input("Tu apuesta:", 0.0, 200.0, step=0.1)
                 if st.button("Confirmar"): st.session_state.comodin_temp = val; st.rerun()
             modal_com()
         
@@ -124,11 +124,11 @@ with menu[0]:
                             c.execute(f"DELETE FROM apuestas WHERE wn='{u_wn}' AND partido_id=999")
                             c.execute("INSERT INTO apuestas VALUES (?,?,?,?,?,?,?,?)", (u_wn, u_nom, u_ape, u_sec, 999, cur_c, 0, ""))
                             db.commit(); db.close(); st.rerun()
-        with f_tabs[1]: st.info("⚽ Los cruces se habilitarán al finalizar la fase de grupos.")
+        with f_tabs[1]: st.info("⚽ Los cruces eliminatorios se habilitarán al finalizar la fase de grupos.")
 
 # --- TAB 2: TABLAS ---
 with menu[1]:
-    st.subheader("📊 Grupos del Mundial")
+    st.subheader("📊 Composición de Grupos")
     df_fix = cargar_fixture()
     grupos = sorted(df_fix[df_fix['fase']=="Grupos"]['grupo'].unique())
     cols = st.columns(3)
@@ -139,53 +139,46 @@ with menu[1]:
             for e in eqs: st.write(f"⚽ {e}")
             st.markdown('</div>', unsafe_allow_html=True)
 
-# --- TAB 3: RANKING (CORAZÓN DEL SISTEMA) ---
+# --- TAB 3: RANKING ---
 with menu[2]:
-    st.subheader("🥇 Ranking en Tiempo Real")
+    st.subheader("🥇 Ranking de Colaboradores")
     try:
         resp = requests.get(URL_RESULTADOS_REALES)
-        df_real = pd.read_excel(BytesIO(resp.content), sheet_name=None)
-        # Unir hojas de grupos y eliminación si existen
-        df_real_all = pd.concat([df_real['Fase de Grupos'], df_real['Fase Eliminatoria']])
+        xlsx = pd.read_excel(BytesIO(resp.content), sheet_name=None)
+        df_real = pd.concat([xlsx['Fase de Grupos'], xlsx['Fase Eliminatoria']])
         
         db = sqlite3.connect('penca.db'); df_ap = pd.read_sql("SELECT * FROM apuestas", db); db.close()
         
         if not df_ap.empty:
-            # 1. Cálculo de puntos partidos
-            merged = df_ap.merge(df_real_all[['partido_id', 'G1 Real', 'G2 Real']], on='partido_id')
-            def calcular_puntos(r):
+            # Cálculo de puntos por partido
+            merged = df_ap.merge(df_real[['partido_id', 'G1 Real', 'G2 Real']], on='partido_id')
+            def calc_pts(r):
                 if pd.isna(r['G1 Real']): return 0
                 if r['g1'] == r['G1 Real'] and r['g2'] == r['G2 Real']: return 3
                 if (r['g1'] > r['g2'] and r['G1 Real'] > r['G2 Real']) or \
                    (r['g1'] < r['g2'] and r['G1 Real'] < r['G2 Real']) or \
                    (r['g1'] == r['g2'] and r['G1 Real'] == r['G2 Real']): return 1
                 return 0
-            merged['pts'] = merged.apply(calcular_puntos, axis=1)
+            merged['puntos'] = merged.apply(calc_pts, axis=1)
             
-            # 2. Resumen por usuario
-            ranking = merged.groupby(['wn', 'nombre', 'apellido', 'sector'])['pts'].sum().reset_index()
-            
-            # 3. Lógica Comodín (Ajustar valor real aquí)
-            VALOR_REAL_VENTAS = 105.5 # Esto idealmente vendría del Excel
-            ranking['diff_comodin'] = 999.0
-            # (Lógica simplificada para simulación, se puede extender)
-            
-            st.dataframe(ranking.sort_values('pts', ascending=False), use_container_width=True)
-        else: st.info("Todavía no hay apuestas registradas.")
-    except Exception as e: st.warning("Cargando resultados oficiales desde GitHub...")
+            # Ranking final
+            res = merged.groupby(['wn', 'nombre', 'apellido', 'sector'])['puntos'].sum().reset_index()
+            st.dataframe(res.sort_values('puntos', ascending=False), use_container_width=True)
+        else: st.info("Esperando las primeras apuestas...")
+    except: st.warning("Conectando con los resultados oficiales en GitHub...")
 
-# --- TAB 4: ADMIN (SIN EL BUG DEL RERUN) ---
+# --- TAB 4: ADMIN (CORREGIDO SIN EL BUG) ---
 with menu[3]:
     if not st.session_state.admin_logged:
-        with st.form("login_admin"):
+        with st.form("admin_login"):
             pw = st.text_input("Contraseña:", type="password")
             if st.form_submit_button("Acceder"):
                 if pw == st.secrets["admin_password"]:
                     st.session_state.admin_logged = True
-                    st.rerun() # Ahora funciona porque no hay un try/except que lo bloquee
+                    st.rerun() # Ahora funciona perfecto
                 else: st.error("Clave incorrecta")
     else:
         if st.button("Cerrar Sesión"): st.session_state.admin_logged = False; st.rerun()
         db = sqlite3.connect('penca.db'); df = pd.read_sql("SELECT * FROM apuestas", db); db.close()
-        st.download_button("📥 Descargar Datos (CSV)", df.to_csv(index=False), "penca_wurth_final.csv", "text/csv")
+        st.download_button("📥 Descargar DB", df.to_csv(index=False), "penca_respaldo.csv", "text/csv")
         st.dataframe(df)
