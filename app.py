@@ -131,13 +131,13 @@ with menu[0]:
                             st.markdown(f'<div class="grupo-header-card"><span>GRUPO {row["grupo"]}{" ✅" if ok else ""}</span><span>{row["hora"]} hs</span></div>', unsafe_allow_html=True)
                             cp, cg1, cg2 = st.columns([4, 1, 1])
                             cp.markdown(f"<br><b>{row['e1']}</b> vs <b>{row['e2']}</b>", unsafe_allow_html=True)
-                            st.session_state[f"g1_{row['id']}"] = cg1.number_input("L", 0, 20, v1, key=f"n1_{row['id']}")
-                            st.session_state[f"g2_{row['id']}"] = cg2.number_input("V", 0, 20, v2, key=f"n2_{row['id']}")
+                            st.session_state[f"n1_{row['id']}"] = cg1.number_input("L", 0, 20, v1, key=f"v1_{row['id']}")
+                            st.session_state[f"n2_{row['id']}"] = cg2.number_input("V", 0, 20, v2, key=f"v2_{row['id']}")
                         if st.form_submit_button("💾 Guardar Día"):
                             db_conn = sqlite3.connect('penca.db'); c = db_conn.cursor()
                             c.execute(f"DELETE FROM apuestas WHERE wn='{u_wn}' AND partido_id IN ({','.join(map(str, p_dia['id']))})")
                             for pid in p_dia['id']:
-                                c.execute("INSERT INTO apuestas VALUES (?,?,?,?,?,?,?,?)", (u_wn, u_nom, u_ape, u_sec, pid, st.session_state[f"n1_{pid}"], st.session_state[f"n2_{pid}"], datetime.now().strftime("%Y-%m-%d %H:%M")))
+                                c.execute("INSERT INTO apuestas VALUES (?,?,?,?,?,?,?,?)", (u_wn, u_nom, u_ape, u_sec, pid, st.session_state[f"v1_{pid}"], st.session_state[f"v2_{pid}"], datetime.now().strftime("%Y-%m-%d %H:%M")))
                             c.execute(f"DELETE FROM apuestas WHERE wn='{u_wn}' AND partido_id=999")
                             c.execute("INSERT INTO apuestas VALUES (?,?,?,?,?,?,?,?)", (u_wn, u_nom, u_ape, u_sec, 999, cur_com, 0, ""))
                             db_conn.commit(); db_conn.close(); st.rerun()
@@ -145,7 +145,7 @@ with menu[0]:
 
 # --- TAB 2: TABLAS ---
 with menu[1]:
-    st.subheader("📊 Grupos")
+    st.subheader("📊 Composición de Grupos")
     df_fix = cargar_fixture()
     grupos = sorted(df_fix[df_fix['fase']=='Grupos']['grupo'].unique())
     cols = st.columns(3)
@@ -156,7 +156,7 @@ with menu[1]:
             for e in eqs: st.write(f"⚽ {e}")
             st.markdown('</div>', unsafe_allow_html=True)
 
-# --- TAB 3: RANKING (NUEVO MOTOR) ---
+# --- TAB 3: RANKING ---
 with menu[2]:
     st.subheader("🥇 Tabla de Posiciones")
     try:
@@ -177,16 +177,17 @@ with menu[2]:
         else: st.info("Esperando apuestas...")
     except: st.warning("Cargando resultados de GitHub...")
 
-# --- TAB 4: ADMIN (CORREGIDO) ---
+# --- TAB 4: ADMIN ---
 with menu[3]:
     if not st.session_state.admin_logged:
         with st.form("admin_login"):
             pw = st.text_input("Contraseña:", type="password")
             if st.form_submit_button("Acceder"):
+                # Busca exactamente admin_password en tus Secrets
                 if "admin_password" in st.secrets and pw == st.secrets["admin_password"]:
                     st.session_state.admin_logged = True
                     st.rerun()
-                else: st.error("Error: Revisa la clave o el Secret 'admin_password'.")
+                else: st.error("Error: Revisa que el Secret sea 'admin_password' y la clave sea correcta.")
     else:
         if st.button("Cerrar Sesión"): st.session_state.admin_logged = False; st.rerun()
         db_conn = sqlite3.connect('penca.db'); df_ad = pd.read_sql("SELECT * FROM apuestas", db_conn); db_conn.close()
