@@ -175,7 +175,7 @@ with menu[2]:
             rank = merged.groupby(['wn', 'nombre', 'apellido', 'sector'])['pts'].sum().reset_index().sort_values('pts', ascending=False)
             st.dataframe(rank, use_container_width=True)
         else: st.info("Esperando apuestas...")
-    except: st.warning("Cargando resultados de GitHub...")
+    except: st.warning("Cargando resultados...")
 
 # --- TAB 4: ADMIN ---
 with menu[3]:
