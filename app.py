@@ -98,7 +98,7 @@ menu = st.tabs(["⚽ PRONÓSTICOS", "🏆 TABLAS", "🥇 RANKING", "🔒 ADMIN"]
 
 # --- TAB 1: PRONÓSTICOS ---
 with menu[0]:
-    st.markdown('<div class="info-card"><b>🏆 PUNTOS:</b> 3 pts Resultado Exacto (ej: 2-1 y terminó 2-1) | 1 pt al resultado Resultado (ej: 2-2 y terminó 1-1).<br><b>🃏 COMODÍN:</b> 50 pts al exacto | 10 pts al Top 10.</div>', unsafe_allow_html=True)
+    st.markdown('<div class="info-card"><b>🏆 PUNTOS:</b> 3 pts Resultado Exacto (ej: pronóstico 2-1 y terminó 2-1) | 1 pt al resultado Resultado (ej: 2-2 y terminó 1-1).<br><b>🃏 COMODÍN:</b> 50 pts al Resultado Exacto | 10 pts al Top 10.</div>', unsafe_allow_html=True)
     c1, c2, c3, c4 = st.columns([1,1,1,2])
     u_nom, u_ape, u_wn = c1.text_input("Nombre:").strip(), c2.text_input("Apellido:").strip(), c3.text_input("WN:").strip().upper()
     u_sec = c4.selectbox("Sector:", ["Finanzas", "Compras", "Créditos", "RRHH", "IT", "Dirección", "Logistica", "Televentas", "Tiendas", "e-Commerce", "Ventas", "Marketing", "Sales Operation", "Otro"], index=None)
